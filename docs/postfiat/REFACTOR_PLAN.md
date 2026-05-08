@@ -36,6 +36,7 @@ The first extraction tranche on `refactor/pftdocs-tooling` moved pure browser lo
 | `www/app/postfiat/app-state.js` | route labels, route normalization, boot hash parsing |
 | `www/app/postfiat/storage.js` | browser JSON storage and bridge/local migration behavior |
 | `www/app/postfiat/tasknode-format.js` | Task Node text extraction, grouping, reward/output formatting |
+| `www/app/postfiat/tasknode-cache.js` | Wallet-scoped Task Node history cache validity, read/write, and cleanup rules |
 | `www/app/postfiat/chat-state.js` | chat session, title, option, and prompt-mode normalization |
 | `www/app/postfiat/chat-context.js` | Task Node chat context packing: recent raw detail plus older summaries/relevance retrieval |
 | `www/app/postfiat/docs-data.js` | Drive document normalization, href selection, text compaction/truncation, chat document extraction |

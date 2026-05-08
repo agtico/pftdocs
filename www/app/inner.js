@@ -22,6 +22,7 @@ define([
     '/components/marked/marked.min.js',
     '/components/hyper-json/hyperjson.js',
     '/app/postfiat/tasknode-format.js',
+    '/app/postfiat/tasknode-cache.js',
     '/app/postfiat/odv.js',
     '/app/postfiat/ai-providers.js',
     '/app/postfiat/runpod-config.js',
@@ -38,9 +39,10 @@ define([
     'less!/app/app-postfiat.less',
 ], function ($, ApiConfig, h, Util, Hash, UI, nThen, SFCommon, Messages, Clipboard,
              PostFiatContacts, Icons, PostFiatWalletCoreBundle,
-             PostFiatPrivateShareBundle, Marked, Hyperjson, TaskNodeFormat, Odv,
-             AiProviders, RunPodConfig, RunPodClient, PostFiatStorage, ChatState,
-             ChatContext, DocsData, SuperthinkEngine, PeerMessages, AppState) {
+             PostFiatPrivateShareBundle, Marked, Hyperjson, TaskNodeFormat,
+             TaskNodeCache, Odv, AiProviders, RunPodConfig, RunPodClient,
+             PostFiatStorage, ChatState, ChatContext, DocsData, SuperthinkEngine,
+             PeerMessages, AppState) {
 
     var APP = {
         route: AppState.getInitialRoute(window.location.hash),
@@ -3414,97 +3416,32 @@ define([
     };
 
     var getTaskNodePrimaryCacheStorage = function () {
-        try {
-            return window.localStorage || window.sessionStorage || null;
-        } catch (err) {
-            return null;
-        }
+        return TaskNodeCache.getPrimaryStorage(window);
     };
 
     var getTaskNodeCacheStorages = function () {
-        var stores = [];
-        var add = function (storage) {
-            if (!storage || stores.indexOf(storage) !== -1) { return; }
-            stores.push(storage);
-        };
-        try { add(window.localStorage); } catch (err) {}
-        try { add(window.sessionStorage); } catch (err) {}
-        return stores;
-    };
-
-    var getTaskNodeCacheKey = function (walletAddress) {
-        return TASKNODE_HISTORY_CACHE_PREFIX + walletAddress;
-    };
-
-    var taskNodeHistoryHasReadableContent = function (data) {
-        var events = data && Array.isArray(data.taskEvents) ? data.taskEvents : [];
-        if ((data && data.latestContext && data.latestContext.text) || !events.length) {
-            return true;
-        }
-        return events.some(function (event) {
-            return Boolean(event && event.decrypted && taskNodeDisplayText(event));
-        });
-    };
-
-    var taskNodeHistoryCacheIsReusable = function (data) {
-        var taskCount = Number(data && data.taskEventCount) || 0;
-        var contextCount = Number(data && data.contextUpdateCount) || 0;
-        if (!data) { return false; }
-        if (!taskCount && !contextCount) { return false; }
-        return taskNodeHistoryHasReadableContent(data);
+        return TaskNodeCache.getStorages(window);
     };
 
     var readTaskNodeSessionCache = function (walletAddress) {
-        var storages = getTaskNodeCacheStorages();
-        var prefixes = [TASKNODE_HISTORY_CACHE_PREFIX]
-            .concat(TASKNODE_HISTORY_CACHE_LEGACY_PREFIXES);
-        var now = Date.now();
-        var raw;
-        var record;
-        var key;
-        var storage;
-        if (!walletAddress) { return null; }
-        for (var s = 0; s < storages.length; s++) {
-            storage = storages[s];
-            for (var p = 0; p < prefixes.length; p++) {
-                key = prefixes[p] + walletAddress;
-                try {
-                    raw = storage.getItem(key);
-                    if (!raw) { continue; }
-                    record = JSON.parse(raw);
-                    if (!record || record.version !== TASKNODE_HISTORY_CACHE_VERSION ||
-                            record.walletAddress !== walletAddress || !record.data ||
-                            record.expiresAt < now ||
-                            !taskNodeHistoryCacheIsReusable(record.data)) {
-                        storage.removeItem(key);
-                        continue;
-                    }
-                    return record;
-                } catch (err) {
-                    try {
-                        storage.removeItem(key);
-                    } catch (removeErr) {
-                        console.error(removeErr);
-                    }
-                }
-            }
-        }
-        return null;
+        return TaskNodeCache.readCache(walletAddress, {
+            displayText: taskNodeDisplayText,
+            prefixes: [TASKNODE_HISTORY_CACHE_PREFIX]
+                .concat(TASKNODE_HISTORY_CACHE_LEGACY_PREFIXES),
+            storages: getTaskNodeCacheStorages(),
+            version: TASKNODE_HISTORY_CACHE_VERSION
+        });
     };
 
     var writeTaskNodeSessionCache = function (walletAddress, data) {
-        var storage = getTaskNodePrimaryCacheStorage();
-        var now = Date.now();
-        if (!storage || !walletAddress || !data) { return; }
-        if (!taskNodeHistoryCacheIsReusable(data)) { return; }
         try {
-            storage.setItem(getTaskNodeCacheKey(walletAddress), JSON.stringify({
-                version: TASKNODE_HISTORY_CACHE_VERSION,
-                walletAddress: walletAddress,
-                cachedAt: now,
-                expiresAt: now + TASKNODE_HISTORY_CACHE_TTL_MS,
-                data: data
-            }));
+            TaskNodeCache.writeCache(walletAddress, data, {
+                displayText: taskNodeDisplayText,
+                prefix: TASKNODE_HISTORY_CACHE_PREFIX,
+                storage: getTaskNodePrimaryCacheStorage(),
+                ttlMs: TASKNODE_HISTORY_CACHE_TTL_MS,
+                version: TASKNODE_HISTORY_CACHE_VERSION
+            });
         } catch (err) {
             console.error(err);
         }
@@ -3523,31 +3460,15 @@ define([
     };
 
     var clearTaskNodeSessionCache = function (walletAddress) {
-        var storages = getTaskNodeCacheStorages();
-        var prefixes = [TASKNODE_HISTORY_CACHE_PREFIX]
-            .concat(TASKNODE_HISTORY_CACHE_LEGACY_PREFIXES);
-        var i;
-        var key;
-        storages.forEach(function (storage) {
-            try {
-                if (walletAddress) {
-                    prefixes.forEach(function (prefix) {
-                        storage.removeItem(prefix + walletAddress);
-                    });
-                    return;
-                }
-                for (i = storage.length - 1; i >= 0; i--) {
-                    key = storage.key(i);
-                    if (key && prefixes.some(function (prefix) {
-                        return key.indexOf(prefix) === 0;
-                    })) {
-                        storage.removeItem(key);
-                    }
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        });
+        try {
+            TaskNodeCache.clearCache(walletAddress, {
+                prefixes: [TASKNODE_HISTORY_CACHE_PREFIX]
+                    .concat(TASKNODE_HISTORY_CACHE_LEGACY_PREFIXES),
+                storages: getTaskNodeCacheStorages()
+            });
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     var getRelayFailureMessage = function (result) {

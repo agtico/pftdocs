@@ -73,10 +73,13 @@ Done when:
 ## Burn 3: Extract Task Node Formatting
 
 - [x] Create `www/app/postfiat/tasknode-format.js`.
+- [x] Create `www/app/postfiat/tasknode-cache.js`.
 - [x] Move pure task text extraction helpers out of `www/app/inner.js`.
 - [x] Move task/reward/output grouping helpers out of `www/app/inner.js`.
 - [x] Move collapsed verification/middle-preview formatting into the module.
 - [x] Add `scripts/tests/postfiat-tasknode-format.test.js`.
+- [x] Add `scripts/tests/postfiat-tasknode-cache.test.js`.
+- [x] Move wallet-scoped Task Node browser-cache validity/read/write/clear rules into the module.
 - [x] Wire Task Node page rendering to imported formatting helpers.
 - [x] Wire chat Task Node context packing to imported formatting helpers.
 - [ ] Confirm no UI regression in task timeline, reward-first grouping, context-doc list, and copy buttons.
