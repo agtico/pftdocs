@@ -59,6 +59,14 @@ define([
             lang: lang,
             time: window.CP_preloadingTime
         };
+        try {
+            if (window.location.pathname === '/app/') {
+                var postFiatRoute = new URLSearchParams(window.location.search).get('pftRoute');
+                if (/^[a-z0-9_-]{1,32}$/.test(postFiatRoute || '')) {
+                    req.postFiatRoute = postFiatRoute;
+                }
+            }
+        } catch (err) {}
         window.rc = requireConfig;
         window.apiconf = ApiConfig;
 
@@ -266,6 +274,9 @@ define([
 	                    var getPostFiatWalletPublicState = function (session) {
 	                        return {
 	                            state: true,
+	                            accountName: Utils.LocalStore.getAccountName(),
+	                            walletSession: Utils.LocalStore.isWalletSession &&
+	                                Utils.LocalStore.isWalletSession(),
 	                            wallet: {
 	                                address: session.wallet.address,
 	                                publicKey: session.wallet.publicKey,
@@ -307,8 +318,8 @@ define([
 	                                throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
 	                            }
 	                            return Promise.resolve(Core.createSessionWallet(saved.mnemonic))
-	                                .then(function (session) {
-	                                    return session || {
+	                                .then(function () {
+	                                    return {
 	                                        mnemonic: saved.mnemonic,
 	                                        wallet: saved.wallet
 	                                    };
@@ -348,20 +359,29 @@ define([
 		                        var cb = Utils.Util.mkAsync(_cb);
 		                        var action = obj && obj.action;
 		                        var data = obj && obj.data || {};
-	                        require([
-	                            '/common/postfiat-private-share.bundle.js',
-	                        ], function () {
-	                            var ShareWorkflow = window.PostFiatPrivateShare;
-	                            if (!ShareWorkflow) {
-	                                return void cb({
-	                                    state: false,
-	                                    error: 'POSTFIAT_SHARE_WORKFLOW_UNAVAILABLE'
-	                                });
-	                            }
-	                            getPostFiatWalletSession().then(function (session) {
-	                                if (action === 'BUILD_OWN_NOSTR_INBOX_DIRECTORY') {
-	                                    return ShareWorkflow.buildOwnNostrInboxDirectory({
-	                                        mnemonic: session.mnemonic,
+		                        require([
+		                            '/common/postfiat-wallet-core.bundle.js',
+		                            '/common/postfiat-private-share.bundle.js',
+		                        ], function () {
+		                            var Core = window.PostFiatWalletCore;
+		                            var ShareWorkflow = window.PostFiatPrivateShare;
+		                            if (!Core) {
+		                                return void cb({
+		                                    state: false,
+		                                    error: 'POSTFIAT_WALLET_CORE_UNAVAILABLE'
+		                                });
+		                            }
+		                            if (!ShareWorkflow) {
+		                                return void cb({
+		                                    state: false,
+		                                    error: 'POSTFIAT_SHARE_WORKFLOW_UNAVAILABLE'
+		                                });
+		                            }
+		                            getPostFiatWalletSession().then(function (session) {
+		                                var pftl = ApiConfig.postFiat && ApiConfig.postFiat.pftl || {};
+		                                if (action === 'BUILD_OWN_NOSTR_INBOX_DIRECTORY') {
+		                                    return ShareWorkflow.buildOwnNostrInboxDirectory({
+		                                        mnemonic: session.mnemonic,
 	                                        postFiatConfig: ApiConfig.postFiat,
 	                                        fallbackRelays: data.fallbackRelays,
 	                                        origin: data.origin
@@ -388,12 +408,58 @@ define([
 	                                        href: data.href,
 	                                        title: data.title,
 	                                        mode: data.mode,
-	                                        timeoutMs: data.timeoutMs
-	                                    });
-	                                }
-	                                if (action === 'FETCH_AND_OPEN_LIVE_PAD_PRIVATE_SHARES') {
-	                                    return ShareWorkflow.fetchAndOpenLivePadPrivateShares({
-	                                        recipientMnemonic: session.mnemonic,
+		                                        timeoutMs: data.timeoutMs
+		                                    });
+		                                }
+		                                if (action === 'PUBLISH_PEER_CHAT_MESSAGE') {
+		                                    return ShareWorkflow.publishPeerChatMessage({
+		                                        senderMnemonic: session.mnemonic,
+		                                        recipientDirectory: data.recipientDirectory,
+		                                        postFiatConfig: ApiConfig.postFiat,
+		                                        fallbackRelays: data.fallbackRelays,
+		                                        directoryRelays: data.directoryRelays,
+		                                        origin: data.origin,
+		                                        text: data.text,
+		                                        payment: data.payment,
+		                                        timeoutMs: data.timeoutMs
+		                                    });
+		                                }
+		                                if (action === 'FETCH_AND_OPEN_PEER_CHAT_MESSAGES') {
+		                                    return ShareWorkflow.fetchAndOpenPeerChatMessages({
+		                                        recipientMnemonic: session.mnemonic,
+		                                        relayUrls: data.relayUrls,
+		                                        postFiatConfig: ApiConfig.postFiat,
+		                                        fallbackRelays: data.fallbackRelays,
+		                                        origin: data.origin,
+		                                        since: data.since,
+		                                        until: data.until,
+		                                        limit: data.limit,
+		                                        timeoutMs: data.timeoutMs
+		                                    });
+		                                }
+		                                if (action === 'FETCH_PFT_BALANCE') {
+		                                    return Core.fetchPftBalance({
+		                                        walletAddress: session.wallet.address,
+		                                        currency: data.currency || pftl.pftCurrency,
+		                                        issuer: data.issuer || pftl.pftIssuer,
+		                                        timeoutMs: data.timeoutMs
+		                                    });
+		                                }
+		                                if (action === 'SUBMIT_PFT_PAYMENT') {
+		                                    return Core.submitPftPayment({
+		                                        mnemonic: session.mnemonic,
+		                                        destination: data.destination,
+		                                        amount: data.amount,
+		                                        currency: data.currency || pftl.pftCurrency,
+		                                        issuer: data.issuer || pftl.pftIssuer,
+		                                        networkId: data.networkId || pftl.networkId,
+		                                        memoText: data.memoText,
+		                                        timeoutMs: data.timeoutMs
+		                                    });
+		                                }
+		                                if (action === 'FETCH_AND_OPEN_LIVE_PAD_PRIVATE_SHARES') {
+		                                    return ShareWorkflow.fetchAndOpenLivePadPrivateShares({
+		                                        recipientMnemonic: session.mnemonic,
 	                                        relayUrls: data.relayUrls,
 	                                        postFiatConfig: ApiConfig.postFiat,
 	                                        fallbackRelays: data.fallbackRelays,
@@ -441,9 +507,21 @@ define([
 		                        }
 
 		                        getPostFiatWalletSession().then(function (session) {
-		                            return Core.loadTaskNodeHistory({
+		                            var loader = data.indexedData || data.snapshot ?
+		                                Core.loadIndexedTaskNodeHistory : Core.loadTaskNodeHistory;
+		                            if (typeof(loader) !== 'function') {
+		                                throw new Error('POSTFIAT_TASKNODE_INDEXED_UNAVAILABLE');
+		                            }
+		                            return loader({
 		                                mnemonic: session.mnemonic,
 		                                walletAddress: session.wallet.address,
+		                                indexedData: data.indexedData,
+		                                snapshot: data.snapshot,
+		                                contextRevisions: data.contextRevisions,
+		                                taskEvents: data.taskEvents,
+		                                taskSubmissions: data.taskSubmissions,
+		                                submissions: data.submissions,
+		                                tasks: data.tasks,
 		                                accountTxLimit: data.accountTxLimit,
 		                                maxPages: data.maxPages,
 		                                maxTaskDetails: data.maxTaskDetails,
@@ -1727,9 +1805,9 @@ define([
             var setDocumentTitle = function () {
                 var newTitle;
                 if (!currentTabTitle) {
-                    newTitle = currentTitle || 'CryptPad';
+                    newTitle = currentTitle || 'PFT Docs';
                 } else {
-                    var title = currentTabTitle.replace(/\{title\}/g, currentTitle || 'CryptPad');
+                    var title = currentTabTitle.replace(/\{title\}/g, currentTitle || 'PFT Docs');
                     newTitle = title + ' - ' + titleSuffix;
                 }
                 document.title = newTitle;

@@ -35,7 +35,7 @@ if (window === window.top) {
 }
 if (typeof(Promise) !== 'function') {
     return void _alert(function (UI, h) {
-        var s = "Internet Explorer is not supported anymore, including by Microsoft.\n\nMost of CryptPad's collaborative functionality requires a modern browser to work.\n\nWe recommend Mozilla Firefox.";
+        var s = "Internet Explorer is not supported anymore, including by Microsoft.\n\nMost of PFT Docs' collaborative functionality requires a modern browser to work.\n\nWe recommend Mozilla Firefox.";
         UI.alert(h('p', {
             style: 'white-space: break-spaces;',
         }, s));

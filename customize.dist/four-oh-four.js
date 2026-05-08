@@ -11,13 +11,10 @@ define([
 
     'less!/customize/src/less2/pages/page-404.less',
 ], function ($, Config, h, LocalStore, Messages) {
-    var urlArgs = Config.requireConf.urlArgs;
-    var img = h('img#cp-logo', {
-        src: '/customize/CryptPad_logo_grey.svg?' + urlArgs
-    });
+    var img = h('div#cp-logo.pft-error-logo', 'PF');
 
     var is500 = Boolean(document.querySelector('#five-hundred'));
-    var brand = h('h1#cp-brand', 'CryptPad');
+    var brand = h('h1#cp-brand', 'PFT Docs');
     // Msg.fivehundred_internalServerError.four04_pageNotFound
     var message = h('h2#cp-scramble', Messages[is500? 'fivehundred_internalServerError':'four04_pageNotFound']);
     var title = h('h2#cp-title', is500? "500":"404");
@@ -90,4 +87,3 @@ define([
         console.log('done');
     })();
 });
-

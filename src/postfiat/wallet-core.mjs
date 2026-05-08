@@ -62,6 +62,14 @@ const DEFAULT_TASKNODE_MAX_PAGES = 8;
 const DEFAULT_TASKNODE_MAX_TASK_DETAILS = 120;
 const DEFAULT_TASKNODE_MAX_CONTEXT_DETAILS = 5;
 const DEFAULT_TASKNODE_FETCH_TIMEOUT_MS = 12000;
+const TASKNODE_IPFS_CACHE_PREFIX = 'PFT_tasknode_ipfs_json_v1:';
+const TASKNODE_IPFS_CACHE_INDEX_KEY = 'PFT_tasknode_ipfs_json_v1:index';
+const TASKNODE_IPFS_CACHE_MAX_ENTRIES = 256;
+export const DEFAULT_PFT_CURRENCY = 'PFT';
+export const DEFAULT_PFT_PAYMENT_FEE_DROPS = '12';
+export const DEFAULT_PFT_PAYMENT_LAST_LEDGER_OFFSET = 20;
+export const DEFAULT_PFT_DROPS_PER_PFT = 1000000n;
+const XRPL_ACCOUNT_RE = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/u;
 
 const getCrypto = () => {
     const cryptoApi = globalThis.crypto;
@@ -198,16 +206,20 @@ export const createMnemonic = () => generateMnemonic(wordlist, DEFAULT_ENTROPY_B
 export const isValidMnemonic = (mnemonic) =>
     validateMnemonic(normalizeMnemonic(mnemonic), wordlist);
 
-export const deriveWalletFromMnemonic = (mnemonic) => {
+const deriveXrplWalletFromMnemonic = (mnemonic) => {
     const normalized = normalizeMnemonic(mnemonic);
     if (!isValidMnemonic(normalized)) {
         throw new Error('INVALID_MNEMONIC');
     }
-
-    const wallet = Wallet.fromMnemonic(normalized, {
+    return Wallet.fromMnemonic(normalized, {
         mnemonicEncoding: 'bip39',
         derivationPath: DEFAULT_DERIVATION_PATH,
     });
+};
+
+export const deriveWalletFromMnemonic = (mnemonic) => {
+    const normalized = normalizeMnemonic(mnemonic);
+    const wallet = deriveXrplWalletFromMnemonic(normalized);
 
     return {
         mnemonic: normalized,
@@ -630,6 +642,233 @@ const fetchJsonWithTimeout = async (url, options = {}) => {
     }
 };
 
+const assertWalletAddress = (value, label = 'walletAddress') => {
+    const text = String(value || '').trim();
+    if (!XRPL_ACCOUNT_RE.test(text)) {
+        throw new Error(`INVALID_${String(label).toUpperCase()}`);
+    }
+    return text;
+};
+
+const normalizePftCurrency = (currency) => {
+    const text = String(currency || DEFAULT_PFT_CURRENCY).trim().toUpperCase();
+    if (!text || text.length > 20) {
+        throw new Error('INVALID_PFT_CURRENCY');
+    }
+    return text;
+};
+
+export const normalizePftAmountValue = (amount) => {
+    const text = String(amount || '').trim();
+    if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/u.test(text) || Number(text) <= 0) {
+        throw new Error('INVALID_PFT_AMOUNT');
+    }
+    if (text.indexOf('.') === -1) { return text; }
+    return text.replace(/0+$/u, '').replace(/\.$/u, '');
+};
+
+export const pftToDrops = (amount) => {
+    const normalized = normalizePftAmountValue(amount);
+    const [whole, fraction = ''] = normalized.split('.');
+    const paddedFraction = `${fraction}000000`.slice(0, 6);
+    const drops = BigInt(whole) * DEFAULT_PFT_DROPS_PER_PFT + BigInt(paddedFraction || '0');
+    if (drops <= 0n) {
+        throw new Error('INVALID_PFT_AMOUNT');
+    }
+    return drops.toString();
+};
+
+export const dropsToPft = (drops) => {
+    const text = String(drops || '0').trim();
+    if (!/^-?\d+$/u.test(text)) {
+        throw new Error('INVALID_PFT_DROPS');
+    }
+    const negative = text.startsWith('-');
+    const raw = BigInt(negative ? text.slice(1) : text);
+    const whole = raw / DEFAULT_PFT_DROPS_PER_PFT;
+    const fraction = raw % DEFAULT_PFT_DROPS_PER_PFT;
+    const fractionText = fraction.toString().padStart(6, '0').replace(/0+$/u, '');
+    return `${negative ? '-' : ''}${whole.toString()}${fractionText ? `.${fractionText}` : ''}`;
+};
+
+const requestPftlRpc = async ({ method, params, timeoutMs } = {}) =>
+    fetchJsonWithTimeout('/api/postfiat/pftl/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            method,
+            params: Array.isArray(params) ? params : [params || {}],
+        }),
+        timeoutMs,
+    });
+
+const unwrapRpcResult = (response) => {
+    const result = response?.result || response;
+    if (result?.error) {
+        throw new Error(result.error_message || result.error);
+    }
+    return result || {};
+};
+
+export const fetchPftBalance = async ({
+    walletAddress,
+    currency,
+    timeoutMs,
+    fetchRpc,
+} = {}) => {
+    const account = assertWalletAddress(walletAddress, 'walletAddress');
+    const normalizedCurrency = normalizePftCurrency(currency);
+    const rpc = fetchRpc || requestPftlRpc;
+    const response = await rpc({
+        method: 'account_info',
+        params: [{
+            account,
+            ledger_index: 'validated',
+        }],
+        timeoutMs,
+    });
+    const result = unwrapRpcResult(response);
+    const accountData = result.account_data || result.accountData || {};
+    const balanceDrops = String(accountData.Balance || '0');
+    return {
+        walletAddress: account,
+        currency: normalizedCurrency,
+        balance: dropsToPft(balanceDrops),
+        balanceDrops,
+        found: Boolean(accountData.Account || accountData.Balance !== undefined),
+        accountData,
+    };
+};
+
+const normalizeNetworkIdForTx = (networkId) => {
+    if (networkId === undefined || networkId === null || networkId === '') { return null; }
+    const parsed = Number.parseInt(String(networkId), 10);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new Error('INVALID_PFTL_NETWORK_ID');
+    }
+    return parsed;
+};
+
+const buildPaymentMemos = (memoText) => {
+    const text = String(memoText || '').trim();
+    if (!text) { return undefined; }
+    return [{
+        Memo: {
+            MemoType: messageToHex('pftdocs.peer-payment'),
+            MemoFormat: messageToHex('text/plain'),
+            MemoData: messageToHex(text.slice(0, 512)),
+        },
+    }];
+};
+
+export const buildPftPaymentTransaction = ({
+    account,
+    destination,
+    amount,
+    currency,
+    sequence,
+    fee,
+    networkId,
+    lastLedgerSequence,
+    memoText,
+} = {}) => {
+    const tx = {
+        TransactionType: 'Payment',
+        Account: assertWalletAddress(account, 'account'),
+        Destination: assertWalletAddress(destination, 'destination'),
+        Amount: pftToDrops(amount),
+        Fee: String(fee || DEFAULT_PFT_PAYMENT_FEE_DROPS),
+        Sequence: Number(sequence),
+    };
+    normalizePftCurrency(currency);
+    if (!Number.isInteger(tx.Sequence) || tx.Sequence < 0) {
+        throw new Error('INVALID_PFT_SEQUENCE');
+    }
+    const normalizedNetworkId = normalizeNetworkIdForTx(networkId);
+    if (normalizedNetworkId !== null && normalizedNetworkId >= 1025) {
+        tx.NetworkID = normalizedNetworkId;
+    }
+    const ledgerSequence = Number(lastLedgerSequence);
+    if (Number.isInteger(ledgerSequence) && ledgerSequence > 0) {
+        tx.LastLedgerSequence = ledgerSequence;
+    }
+    const memos = buildPaymentMemos(memoText);
+    if (memos) { tx.Memos = memos; }
+    return tx;
+};
+
+export const submitPftPayment = async ({
+    mnemonic,
+    destination,
+    amount,
+    currency,
+    networkId,
+    timeoutMs,
+    memoText,
+    fetchRpc,
+} = {}) => {
+    const wallet = deriveXrplWalletFromMnemonic(mnemonic);
+    const account = wallet.classicAddress;
+    const normalizedCurrency = normalizePftCurrency(currency);
+    const rpc = fetchRpc || requestPftlRpc;
+
+    const accountInfo = unwrapRpcResult(await rpc({
+        method: 'account_info',
+        params: [{
+            account,
+            ledger_index: 'validated',
+        }],
+        timeoutMs,
+    }));
+    const accountData = accountInfo.account_data || accountInfo.accountData || {};
+    const sequence = Number(accountData.Sequence);
+    let lastLedgerSequence;
+    try {
+        const currentLedger = unwrapRpcResult(await rpc({
+            method: 'ledger_current',
+            params: [{}],
+            timeoutMs,
+        }));
+        const currentIndex = Number(currentLedger.ledger_current_index);
+        if (Number.isInteger(currentIndex) && currentIndex > 0) {
+            lastLedgerSequence = currentIndex + DEFAULT_PFT_PAYMENT_LAST_LEDGER_OFFSET;
+        }
+    } catch (err) {
+        lastLedgerSequence = undefined;
+    }
+
+    const transaction = buildPftPaymentTransaction({
+        account,
+        destination,
+        amount,
+        currency: normalizedCurrency,
+        sequence,
+        networkId,
+        lastLedgerSequence,
+        memoText,
+    });
+    const signed = wallet.sign(transaction);
+    const submitted = await rpc({
+        method: 'submit',
+        params: [{
+            tx_blob: signed.tx_blob,
+        }],
+        timeoutMs,
+    });
+    const result = unwrapRpcResult(submitted);
+    return {
+        walletAddress: account,
+        destination: transaction.Destination,
+        amount: normalizePftAmountValue(amount),
+        amountDrops: transaction.Amount,
+        currency: normalizedCurrency,
+        transaction,
+        hash: signed.hash || result.tx_json?.hash || result.tx_hash || null,
+        txBlob: signed.tx_blob,
+        result,
+    };
+};
+
 const fetchTaskNodeAccountTxPage = async ({ walletAddress, marker, limit, timeoutMs } = {}) => {
     const url = buildTaskNodeProxyUrl(
         `/api/postfiat/pftl/account-tx/${encodeURIComponent(walletAddress)}`,
@@ -671,12 +910,109 @@ const fetchTaskNodeAccountTx = async ({ walletAddress, limit, maxPages, timeoutM
     return { transactions, pages, complete: !marker, nextMarker: marker };
 };
 
+const getTaskNodeIpfsCacheStorage = () => {
+    try {
+        return globalThis.localStorage || null;
+    } catch (err) {
+        return null;
+    }
+};
+
+const readTaskNodeIpfsCacheIndex = (storage) => {
+    try {
+        const raw = storage.getItem(TASKNODE_IPFS_CACHE_INDEX_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+};
+
+const writeTaskNodeIpfsCacheIndex = (storage, entries) => {
+    try {
+        storage.setItem(TASKNODE_IPFS_CACHE_INDEX_KEY, JSON.stringify(entries));
+    } catch (err) {
+        // Cache writes are best-effort.
+    }
+};
+
+const pruneTaskNodeIpfsCache = (storage, index) => {
+    const ordered = index.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const keep = ordered.slice(0, TASKNODE_IPFS_CACHE_MAX_ENTRIES);
+    const keepSet = new Set(keep.map((entry) => entry.cid));
+    ordered.slice(TASKNODE_IPFS_CACHE_MAX_ENTRIES).forEach((entry) => {
+        try {
+            storage.removeItem(TASKNODE_IPFS_CACHE_PREFIX + entry.cid);
+        } catch (err) {
+            // Ignore quota/cache cleanup failures.
+        }
+    });
+    return keep.filter((entry) => keepSet.has(entry.cid));
+};
+
+const readTaskNodeIpfsCache = (cid) => {
+    if (!cid) { return undefined; }
+    const storage = getTaskNodeIpfsCacheStorage();
+    if (!storage) { return undefined; }
+    try {
+        const raw = storage.getItem(TASKNODE_IPFS_CACHE_PREFIX + cid);
+        if (!raw) { return undefined; }
+        const record = JSON.parse(raw);
+        if (!record || record.cid !== cid || !isTaskNodeEncryptedBlob(record.payload)) {
+            storage.removeItem(TASKNODE_IPFS_CACHE_PREFIX + cid);
+            return undefined;
+        }
+        const now = Date.now();
+        const index = readTaskNodeIpfsCacheIndex(storage).filter((entry) =>
+            entry && entry.cid !== cid
+        );
+        index.unshift({ cid, updatedAt: now });
+        writeTaskNodeIpfsCacheIndex(storage, pruneTaskNodeIpfsCache(storage, index));
+        return record.payload;
+    } catch (err) {
+        return undefined;
+    }
+};
+
+const writeTaskNodeIpfsCache = (cid, payload) => {
+    if (!cid || !isTaskNodeEncryptedBlob(payload)) { return; }
+    const storage = getTaskNodeIpfsCacheStorage();
+    if (!storage) { return; }
+    try {
+        const now = Date.now();
+        storage.setItem(TASKNODE_IPFS_CACHE_PREFIX + cid, JSON.stringify({
+            version: 1,
+            cid,
+            updatedAt: now,
+            payload,
+        }));
+        const index = readTaskNodeIpfsCacheIndex(storage).filter((entry) =>
+            entry && entry.cid !== cid
+        );
+        index.unshift({ cid, updatedAt: now });
+        writeTaskNodeIpfsCacheIndex(storage, pruneTaskNodeIpfsCache(storage, index));
+    } catch (err) {
+        // Cache writes are best-effort.
+    }
+};
+
 const fetchTaskNodeIpfsJson = async ({ cid, timeoutMs } = {}) => {
+    const cached = readTaskNodeIpfsCache(cid);
+    if (cached !== undefined) {
+        return cached;
+    }
     const url = `/api/postfiat/ipfs/${encodeURIComponent(cid)}`;
     const response = await fetchJsonWithTimeout(url, { timeoutMs });
-    return response && Object.prototype.hasOwnProperty.call(response, 'payload') ?
+    const payload = response && Object.prototype.hasOwnProperty.call(response, 'payload') ?
         response.payload : response;
+    if (isTaskNodeEncryptedBlob(payload)) {
+        writeTaskNodeIpfsCache(cid, payload);
+    }
+    return payload;
 };
+
+const isPlainObject = (value) =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 const parseMaybeJson = (text) => {
     if (typeof text !== 'string') { return text; }
@@ -687,21 +1023,234 @@ const parseMaybeJson = (text) => {
     }
 };
 
-const summarizeTaskPayload = (payload) => {
-    const obj = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+const asArray = (value) => Array.isArray(value) ? value : [];
+
+const normalizeIndexedText = (value) => {
+    if (typeof value !== 'string') { return ''; }
+    return value.trim();
+};
+
+const normalizeIndexedDate = (value) => {
+    if (!value) { return null; }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    }
+    if (typeof value === 'number') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    }
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const parseIndexedJsonField = (value) => {
+    if (typeof value !== 'string') { return value; }
+    const trimmed = value.trim();
+    if (!trimmed) { return null; }
+    if (!/^[{[]/u.test(trimmed)) { return value; }
+    try {
+        return JSON.parse(trimmed);
+    } catch (err) {
+        return value;
+    }
+};
+
+const pickIndexedField = (row, names) => {
+    for (let i = 0; i < names.length; i += 1) {
+        const value = row?.[names[i]];
+        if (value !== undefined && value !== null && value !== '') {
+            return value;
+        }
+    }
+    return null;
+};
+
+const normalizeIndexedCid = (value) => {
+    const text = normalizeIndexedText(value);
+    return text || null;
+};
+
+const normalizeIndexedPayload = (payload) => {
+    const parsed = parseIndexedJsonField(payload);
+    return typeof parsed === 'undefined' ? null : parsed;
+};
+
+const findCidInIndexedPayload = (payload) => {
+    const parsed = normalizeIndexedPayload(payload);
+    if (!parsed) { return null; }
+    if (typeof parsed === 'string') {
+        return normalizeIndexedCid(parsed);
+    }
+    if (!isPlainObject(parsed)) { return null; }
+    const direct = pickIndexedField(parsed, [
+        'artifact_cid',
+        'artifactCid',
+        'encrypted_cid',
+        'encryptedCid',
+        'response_cid',
+        'responseCid',
+        'context_doc_cid',
+        'contextDocCid',
+        'cid',
+    ]);
+    if (direct) {
+        return normalizeIndexedCid(direct);
+    }
+    const artifact = isPlainObject(parsed.artifact) ? parsed.artifact : null;
+    const artifactCid = artifact && pickIndexedField(artifact, [
+        'encrypted_cid',
+        'encryptedCid',
+        'cid',
+        'artifact_cid',
+        'artifactCid',
+    ]);
+    if (artifactCid) {
+        return normalizeIndexedCid(artifactCid);
+    }
+    const artifacts = asArray(parsed.artifacts);
+    for (let i = 0; i < artifacts.length; i += 1) {
+        const entry = artifacts[i];
+        const entryCid = pickIndexedField(entry, [
+            'encrypted_cid',
+            'encryptedCid',
+            'cid',
+            'artifact_cid',
+            'artifactCid',
+        ]) || pickIndexedField(entry?.artifact, [
+            'encrypted_cid',
+            'encryptedCid',
+            'cid',
+            'artifact_cid',
+            'artifactCid',
+        ]);
+        if (entryCid) {
+            return normalizeIndexedCid(entryCid);
+        }
+    }
+    return null;
+};
+
+const normalizeReadableText = (value) => {
+    if (typeof value !== 'string') { return ''; }
+    return value.replace(/\r\n/g, '\n').trim();
+};
+
+const pickReadableField = (obj, names) => {
+    for (let i = 0; i < names.length; i += 1) {
+        const text = normalizeReadableText(obj?.[names[i]]);
+        if (text) { return text; }
+    }
+    return '';
+};
+
+const artifactReadableText = (entry) => {
+    const artifact = isPlainObject(entry?.artifact) ? entry.artifact :
+        (isPlainObject(entry) ? entry : {});
+    const direct = pickReadableField(artifact, [
+        'response',
+        'response_text',
+        'responseText',
+        'codeSnippet',
+        'code_snippet',
+        'text',
+        'content',
+        'description',
+        'url',
+        'repoUrl',
+        'repo_url',
+    ]);
+    if (direct) { return direct; }
+
+    const imageDescription = pickReadableField(entry, [
+        'image_description',
+        'imageDescription',
+    ]);
+    if (imageDescription) { return imageDescription; }
+
+    const fileName = normalizeReadableText(artifact.fileName || artifact.file_name);
+    const mimeType = normalizeReadableText(artifact.mimeType || artifact.mime_type);
+    if (fileName || mimeType) {
+        return [fileName, mimeType].filter(Boolean).join(' ');
+    }
+    return '';
+};
+
+export const extractTaskNodeReadableText = (payload, event = {}) => {
+    if (typeof payload === 'string') {
+        return normalizeReadableText(payload);
+    }
+    if (!isPlainObject(payload)) { return ''; }
+
+    const sections = [];
+    const add = (text) => {
+        const normalized = normalizeReadableText(text);
+        if (normalized && !sections.includes(normalized)) {
+            sections.push(normalized);
+        }
+    };
+
+    add(pickReadableField(payload, [
+        'response_text',
+        'responseText',
+        'response',
+        'reward_summary',
+        'rewardSummary',
+        'codeSnippet',
+        'code_snippet',
+        'image_description',
+        'imageDescription',
+        'text',
+        'content',
+        'description',
+        'title',
+    ]));
+
+    add(artifactReadableText(payload.artifact));
+    asArray(payload.artifacts).forEach((entry) => {
+        add(artifactReadableText(entry));
+    });
+
+    if (isPlainObject(payload.reward_payload)) {
+        add(pickReadableField(payload.reward_payload, [
+            'summary',
+            'reason',
+            'response',
+            'text',
+            'description',
+        ]));
+    }
+
+    if (!sections.length) {
+        add(event.title || event.cid || '');
+    }
+    return sections.join('\n\n');
+};
+
+const summarizeTaskPayload = (payload, event = {}) => {
+    const preview = extractTaskNodeReadableText(payload, event);
+    if (typeof payload === 'string') {
+        return {
+            taskId: event.taskId || null,
+            phase: event.eventType || event.kindLabel || '',
+            verificationType: event.artifactType || '',
+            createdAt: event.createdAt || null,
+            artifactCount: event.artifactCount || 0,
+            preview,
+        };
+    }
+    const obj = isPlainObject(payload) ? payload : {};
     const artifacts = Array.isArray(obj.artifacts) ? obj.artifacts : [];
     const firstArtifact = artifacts[0] || {};
     return {
-        taskId: obj.task_id || obj.taskId || null,
-        phase: obj.phase || '',
+        taskId: obj.task_id || obj.taskId || event.taskId || null,
+        phase: obj.phase || event.eventType || event.kindLabel || '',
         verificationType: obj.verification_type || obj.verificationType ||
-            firstArtifact.evidence_type || '',
-        createdAt: obj.created_at || obj.createdAt || null,
-        artifactCount: artifacts.length || (obj.artifact ? 1 : 0),
-        preview: obj.response || obj.response_text || obj.responseText ||
-            obj.artifact?.response || firstArtifact.artifact?.response ||
-            obj.artifact?.url || firstArtifact.artifact?.url ||
-            obj.artifact?.repoUrl || firstArtifact.artifact?.repoUrl || '',
+            obj.artifact_type || obj.artifactType || firstArtifact.evidence_type ||
+            event.artifactType || '',
+        createdAt: obj.created_at || obj.createdAt || event.createdAt || null,
+        artifactCount: artifacts.length || obj.artifact_count || obj.artifactCount ||
+            event.artifactCount || (obj.artifact ? 1 : 0),
+        preview,
     };
 };
 
@@ -710,6 +1259,7 @@ const hydratePointerEvents = async ({
     mnemonic,
     maxDetails,
     timeoutMs,
+    fetchIpfsJson = fetchTaskNodeIpfsJson,
 } = {}) => {
     const rows = [];
     const failures = [];
@@ -717,8 +1267,18 @@ const hydratePointerEvents = async ({
     const selected = (Array.isArray(events) ? events : []).slice(0, limit);
     for (let i = 0; i < selected.length; i += 1) {
         const event = selected[i];
+        if (!event.cid) {
+            rows.push({
+                ...event,
+                payload: event.payload || null,
+                plaintext: null,
+                decrypted: false,
+                summary: summarizeTaskPayload(event.payload, event),
+            });
+            continue;
+        }
         try {
-            const blob = await fetchTaskNodeIpfsJson({ cid: event.cid, timeoutMs });
+            const blob = await fetchIpfsJson({ cid: event.cid, timeoutMs });
             let plaintext = null;
             let payload = blob;
             if (isTaskNodeEncryptedBlob(blob)) {
@@ -730,7 +1290,8 @@ const hydratePointerEvents = async ({
                 payload,
                 plaintext,
                 decrypted: plaintext !== null,
-                summary: summarizeTaskPayload(payload),
+                eventPayload: event.payload || null,
+                summary: summarizeTaskPayload(payload, event),
             });
         } catch (err) {
             failures.push({
@@ -746,7 +1307,8 @@ const hydratePointerEvents = async ({
                 plaintext: null,
                 decrypted: false,
                 error: err?.message || String(err),
-                summary: {},
+                eventPayload: event.payload || null,
+                summary: summarizeTaskPayload(event.payload, event),
             });
         }
     }
@@ -781,6 +1343,298 @@ const groupTaskHistoryRows = (events) => {
         const bTime = Date.parse(b.latestAt || '') || 0;
         return bTime - aTime;
     });
+};
+
+const taskEventTypeToKind = (eventType) => {
+    switch (eventType) {
+    case 'submission_recorded':
+    case 'evidence_uploaded':
+    case 'verification_response_evidence':
+    case 'verification_responded':
+        return TASKNODE_CONTENT_KIND.TASK_SUBMISSION;
+    case 'reward_paid':
+    case 'reward_skipped':
+        return TASKNODE_CONTENT_KIND.REWARD;
+    case 'task_generated':
+        return TASKNODE_CONTENT_KIND.TASK;
+    default:
+        return TASKNODE_CONTENT_KIND.TASK_UPDATE;
+    }
+};
+
+const normalizeIndexedTaskRows = (rows) => {
+    const map = new Map();
+    asArray(rows).forEach((row) => {
+        if (!row) { return; }
+        const id = normalizeIndexedText(pickIndexedField(row, ['id', 'task_id', 'taskId']));
+        if (!id) { return; }
+        map.set(id, {
+            id,
+            title: pickIndexedField(row, ['title', 'task_title', 'taskTitle']) || '',
+            status: pickIndexedField(row, ['status']) || '',
+            verificationType: pickIndexedField(row, [
+                'verification_type',
+                'verificationType',
+            ]) || '',
+            createdAt: normalizeIndexedDate(pickIndexedField(row, ['created_at', 'createdAt'])),
+        });
+    });
+    return map;
+};
+
+export const normalizeIndexedTaskNodeSnapshot = ({
+    walletAddress,
+    tasks,
+    taskEvents,
+    taskSubmissions,
+    submissions,
+    contextRevisions,
+    context,
+} = {}) => {
+    const taskMap = normalizeIndexedTaskRows(tasks);
+    const contextRows = asArray(contextRevisions || context).map((row, index) => {
+        const cid = normalizeIndexedCid(pickIndexedField(row, [
+            'cid',
+            'context_doc_cid',
+            'contextDocCid',
+        ]));
+        if (!cid) { return null; }
+        return {
+            cid,
+            kind: TASKNODE_CONTENT_KIND.CONTEXT,
+            kindLabel: TASKNODE_KIND_LABELS[TASKNODE_CONTENT_KIND.CONTEXT],
+            schema: null,
+            flags: 0,
+            taskId: null,
+            threadId: null,
+            contextId: pickIndexedField(row, ['id', 'context_id', 'contextId']) || null,
+            txHash: pickIndexedField(row, ['tx_hash', 'txHash', 'pftl_tx_hash', 'pftlTxHash']) || null,
+            ledgerIndex: pickIndexedField(row, ['ledger_index', 'ledgerIndex']) || null,
+            memoIndex: pickIndexedField(row, ['memo_index', 'memoIndex']) || index,
+            createdAt: normalizeIndexedDate(pickIndexedField(row, [
+                'created_at',
+                'createdAt',
+                'tx_timestamp',
+                'txTimestamp',
+            ])),
+            account: walletAddress || null,
+            destination: null,
+            direction: 'indexed',
+            source: 'pftasks.context_revisions',
+            version: pickIndexedField(row, ['context_version', 'contextVersion']) || null,
+            wordCount: pickIndexedField(row, ['word_count', 'wordCount']) || null,
+        };
+    }).filter(Boolean);
+
+    const taskRows = asArray(taskEvents).map((row, index) => {
+        const payload = normalizeIndexedPayload(pickIndexedField(row, [
+            'event_payload',
+            'eventPayload',
+            'payload',
+        ]));
+        const taskId = normalizeIndexedText(pickIndexedField(row, [
+            'task_id',
+            'taskId',
+        ]));
+        const eventType = normalizeIndexedText(pickIndexedField(row, [
+            'event_type',
+            'eventType',
+        ])) || 'task_update';
+        const kind = taskEventTypeToKind(eventType);
+        const task = taskMap.get(taskId) || {};
+        return {
+            cid: findCidInIndexedPayload(payload),
+            kind,
+            kindLabel: TASKNODE_KIND_LABELS[kind],
+            schema: null,
+            flags: 0,
+            taskId: taskId || null,
+            threadId: null,
+            contextId: null,
+            txHash: pickIndexedField(row, ['pftl_tx_hash', 'pftlTxHash', 'tx_hash', 'txHash']) || null,
+            ledgerIndex: pickIndexedField(row, ['ledger_index', 'ledgerIndex']) || null,
+            memoIndex: pickIndexedField(row, ['memo_index', 'memoIndex']) || index,
+            createdAt: normalizeIndexedDate(pickIndexedField(row, ['created_at', 'createdAt'])),
+            account: walletAddress || null,
+            destination: null,
+            direction: 'indexed',
+            source: 'pftasks.task_events',
+            eventId: pickIndexedField(row, ['id', 'event_id', 'eventId']) || null,
+            eventType,
+            payload,
+            title: task.title || '',
+            status: task.status || '',
+            artifactType: task.verificationType || '',
+        };
+    });
+
+    const seenSubmissionKeys = new Set(taskRows.map((row) => [
+        row.taskId || '',
+        row.cid || '',
+        row.txHash || '',
+        row.eventType || '',
+    ].join(':')));
+    asArray(taskSubmissions || submissions).forEach((row, index) => {
+        const taskId = normalizeIndexedText(pickIndexedField(row, ['task_id', 'taskId']));
+        const cid = normalizeIndexedCid(pickIndexedField(row, ['artifact_cid', 'artifactCid']));
+        const txHash = pickIndexedField(row, ['pftl_tx_hash', 'pftlTxHash', 'tx_hash', 'txHash']) || null;
+        const key = [taskId || '', cid || '', txHash || '', 'submission_recorded'].join(':');
+        if (seenSubmissionKeys.has(key)) { return; }
+        seenSubmissionKeys.add(key);
+        const artifacts = asArray(normalizeIndexedPayload(pickIndexedField(row, [
+            'evidence_artifacts',
+            'evidenceArtifacts',
+        ])));
+        const task = taskMap.get(taskId) || {};
+        taskRows.push({
+            cid,
+            kind: TASKNODE_CONTENT_KIND.TASK_SUBMISSION,
+            kindLabel: TASKNODE_KIND_LABELS[TASKNODE_CONTENT_KIND.TASK_SUBMISSION],
+            schema: null,
+            flags: 0,
+            taskId: taskId || null,
+            threadId: null,
+            contextId: null,
+            txHash,
+            ledgerIndex: pickIndexedField(row, ['ledger_index', 'ledgerIndex']) || null,
+            memoIndex: pickIndexedField(row, ['memo_index', 'memoIndex']) || index,
+            createdAt: normalizeIndexedDate(pickIndexedField(row, ['created_at', 'createdAt'])),
+            account: walletAddress || null,
+            destination: null,
+            direction: 'indexed',
+            source: 'pftasks.task_submissions',
+            eventId: pickIndexedField(row, ['id', 'submission_id', 'submissionId']) || null,
+            eventType: 'submission_recorded',
+            artifactType: pickIndexedField(row, ['artifact_type', 'artifactType']) ||
+                task.verificationType || '',
+            artifactCount: artifacts.length || (cid ? 1 : 0),
+            payload: {
+                submission_id: pickIndexedField(row, ['id', 'submission_id', 'submissionId']) || null,
+                task_id: taskId || null,
+                artifact_cid: cid,
+                artifact_type: pickIndexedField(row, ['artifact_type', 'artifactType']) || '',
+                artifacts,
+            },
+            title: task.title || '',
+            status: task.status || '',
+        });
+    });
+
+    const sortDesc = (a, b) => {
+        const aTime = Date.parse(a.createdAt || '') || 0;
+        const bTime = Date.parse(b.createdAt || '') || 0;
+        if (aTime !== bTime) { return bTime - aTime; }
+        return (b.ledgerIndex || 0) - (a.ledgerIndex || 0);
+    };
+
+    return {
+        contextEvents: contextRows.sort(sortDesc),
+        taskEvents: taskRows.sort(sortDesc),
+    };
+};
+
+const getIndexedSnapshot = (options) => {
+    const indexedData = options.indexedData || options.snapshot || {};
+    return {
+        walletAddress: options.walletAddress ||
+            pickIndexedField(indexedData.wallet || indexedData, [
+                'wallet_address',
+                'walletAddress',
+                'address',
+            ]) || null,
+        contextRevisions: options.contextRevisions || indexedData.contextRevisions ||
+            indexedData.context_revisions || indexedData.context || [],
+        tasks: options.tasks || indexedData.tasks || [],
+        taskEvents: options.taskEvents || indexedData.taskEvents ||
+            indexedData.task_events || [],
+        taskSubmissions: options.taskSubmissions || options.submissions ||
+            indexedData.taskSubmissions || indexedData.task_submissions ||
+            indexedData.submissions || [],
+    };
+};
+
+export const loadIndexedTaskNodeHistory = async (options = {}) => {
+    const {
+        mnemonic,
+        maxTaskDetails = DEFAULT_TASKNODE_MAX_TASK_DETAILS,
+        maxContextDetails = DEFAULT_TASKNODE_MAX_CONTEXT_DETAILS,
+        timeoutMs = DEFAULT_TASKNODE_FETCH_TIMEOUT_MS,
+        fetchIpfsJson = fetchTaskNodeIpfsJson,
+    } = options;
+    if (!mnemonic) {
+        throw new Error('POSTFIAT_WALLET_SESSION_REQUIRED');
+    }
+    const wallet = deriveWalletFromMnemonic(mnemonic);
+    const snapshot = getIndexedSnapshot(options);
+    const address = snapshot.walletAddress || wallet.address;
+    if (address !== wallet.address) {
+        throw new Error('POSTFIAT_WALLET_ACCOUNT_MISMATCH');
+    }
+
+    const normalized = normalizeIndexedTaskNodeSnapshot({
+        walletAddress: address,
+        contextRevisions: snapshot.contextRevisions,
+        tasks: snapshot.tasks,
+        taskEvents: snapshot.taskEvents,
+        taskSubmissions: snapshot.taskSubmissions,
+    });
+    const taskHydration = await hydratePointerEvents({
+        events: normalized.taskEvents,
+        mnemonic,
+        maxDetails: maxTaskDetails,
+        timeoutMs,
+        fetchIpfsJson,
+    });
+    const contextHydration = await hydratePointerEvents({
+        events: normalized.contextEvents,
+        mnemonic,
+        maxDetails: maxContextDetails,
+        timeoutMs,
+        fetchIpfsJson,
+    });
+    const taskDetailLimit = Math.max(0, Number.isInteger(maxTaskDetails) ?
+        maxTaskDetails : DEFAULT_TASKNODE_MAX_TASK_DETAILS);
+    const taskRows = taskHydration.rows.concat(normalized.taskEvents.slice(taskDetailLimit)
+        .map((event) => ({
+            ...event,
+            payload: event.payload || null,
+            plaintext: null,
+            decrypted: false,
+            summary: summarizeTaskPayload(event.payload, event),
+            detailDeferred: true,
+        })));
+    const latestContext = contextHydration.rows[0] || null;
+
+    return {
+        walletAddress: address,
+        scannedTransactions: 0,
+        accountTxPages: [],
+        accountTxComplete: true,
+        pointerCount: normalized.taskEvents.length + normalized.contextEvents.length,
+        taskEventCount: normalized.taskEvents.length,
+        contextUpdateCount: normalized.contextEvents.length,
+        tasks: groupTaskHistoryRows(taskRows),
+        taskEvents: taskRows,
+        taskHydrationFailures: taskHydration.failures,
+        contextUpdates: normalized.contextEvents,
+        contextDetails: contextHydration.rows,
+        contextHydrationFailures: contextHydration.failures,
+        latestContext: latestContext ? {
+            cid: latestContext.cid,
+            txHash: latestContext.txHash,
+            ledgerIndex: latestContext.ledgerIndex,
+            createdAt: latestContext.createdAt,
+            text: typeof latestContext.payload === 'string' ?
+                latestContext.payload : latestContext.plaintext,
+            payload: latestContext.payload,
+            decrypted: latestContext.decrypted,
+            error: latestContext.error || null,
+        } : null,
+        source: {
+            indexed: 'pftasks',
+            ipfs: '/api/postfiat/ipfs',
+        },
+    };
 };
 
 export const loadTaskNodeHistory = async ({

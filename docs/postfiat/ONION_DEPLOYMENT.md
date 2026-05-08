@@ -1,6 +1,6 @@
 # Post Fiat Onion Deployment
 
-Tor onion services are the preferred no-KYC, no-origin-IP exposure path for privacy-oriented Post Fiat Docs instances. Cloudflare Tunnel is deprecated for this fork's default hosted testing path because it introduces a centralized metadata provider and a provider-owned public URL.
+Tor onion services are the preferred no-KYC, no-origin-IP exposure path for privacy-oriented PFT Docs instances. Cloudflare Tunnel is deprecated for this fork's default hosted testing path because it introduces a centralized metadata provider and a provider-owned public URL.
 
 ## Local Onion Dev
 

@@ -15,15 +15,19 @@ import {
 } from '../../src/postfiat/nostr-identity.mjs';
 import {
     buildLivePadPrivateShare,
+    buildPeerChatMessage,
     buildNostrInboxDirectoryDTag,
     buildOwnNostrInboxDirectory,
     buildSignedNostrInboxDirectoryEvent,
     fetchNostrInboxDirectories,
+    fetchAndOpenPeerChatMessages,
     fetchAndOpenLivePadPrivateShares,
     normalizePrivateShareRecipient,
     NOSTR_KIND_POSTFIAT_DIRECTORY,
+    openPeerChatMessage,
     openLivePadPrivateShare,
     parseNostrInboxDirectoryEvent,
+    publishPeerChatMessage,
     publishOwnNostrInboxDirectory,
     publishLivePadPrivateShare,
     resolvePrivateShareRecipient,
@@ -245,6 +249,39 @@ test('accepts pubkey-only private share recipients with configured relay fallbac
     assert.deepEqual(built.relays, ['wss://instance-relay.example', 'wss://backup-relay.example']);
 });
 
+test('accepts wallet plus pubkey peer chat recipients without a signed directory record', async () => {
+    const identity = await deriveNostrIdentityFromMnemonic(RECIPIENT_MNEMONIC, {
+        origin: ORIGIN,
+    });
+    const recipient = normalizePrivateShareRecipient({
+        walletAddress: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        publicKeyHex: identity.publicKeyHex,
+        relays: ['wss://recipient.example/'],
+    });
+
+    assert.deepEqual(recipient, {
+        walletAddress: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        publicKeyHex: identity.publicKeyHex,
+        relays: ['wss://recipient.example'],
+    });
+
+    const built = await buildPeerChatMessage({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: recipient,
+        origin: ORIGIN,
+        text: 'reply smoke',
+        postFiatConfig: {
+            nostr: {
+                privateRelays: ['wss://fallback.example'],
+            },
+        },
+    });
+
+    assert.equal(built.recipient.walletAddress, 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV');
+    assert.equal(built.recipient.publicKeyHex, identity.publicKeyHex);
+    assert.deepEqual(built.relays, ['wss://recipient.example']);
+});
+
 test('builds an own inbox directory from the current wallet mnemonic', async () => {
     const directory = await buildOwnNostrInboxDirectory({
         mnemonic: RECIPIENT_MNEMONIC,
@@ -334,6 +371,45 @@ test('builds a private share by resolving a wallet address through directory rel
     assert.equal(built.payload.title, 'Wallet address share');
 });
 
+test('builds and opens peer chat messages without treating them as document shares', async () => {
+    const directory = await makeRecipientDirectory();
+    const built = await buildPeerChatMessage({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: directory,
+        origin: ORIGIN,
+        text: 'hello over nostr',
+        payment: {
+            amount: '12.5',
+            currency: 'PFT',
+            txHash: 'ABC123',
+            destination: directory.walletAddress,
+        },
+        createdAt: '2026-05-03T00:00:00.000Z',
+        currentTime: 1777766400,
+        rumorCreatedAt: 1777766300,
+        sealCreatedAt: 1777766200,
+        wrapCreatedAt: 1777766100,
+        sealNonce: hexToBytes('11'.repeat(32)),
+        wrapNonce: hexToBytes('22'.repeat(32)),
+        wrapperPrivateKeyHex: '0000000000000000000000000000000000000000000000000000000000000003',
+    });
+
+    const opened = await openPeerChatMessage({
+        recipientMnemonic: RECIPIENT_MNEMONIC,
+        giftWrap: built.giftWrap,
+        origin: ORIGIN,
+    });
+
+    assert.equal(opened.payload.text, 'hello over nostr');
+    assert.equal(opened.payload.fromWallet, 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    assert.equal(opened.payload.payment.currency, 'PFT');
+    await assert.rejects(openLivePadPrivateShare({
+        recipientMnemonic: RECIPIENT_MNEMONIC,
+        giftWrap: built.giftWrap,
+        origin: ORIGIN,
+    }), /NOT_PRIVATE_SHARE_MESSAGE/);
+});
+
 test('publishes and fetches live-pad private shares through relay helpers', async () => {
     const directory = await makeRecipientDirectory();
     const { FakeWebSocket: PublisherSocket, sockets: publishSockets } = createFakeWebSocket();
@@ -373,4 +449,58 @@ test('publishes and fetches live-pad private shares through relay helpers', asyn
     assert.equal(inbox.failures.length, 0);
     assert.equal(inbox.shares[0].payload.mode, 'view');
     assert.equal(inbox.shares[0].payload.href, '/pad/#/2/pad/edit/example/');
+});
+
+test('publishes and fetches peer chat messages through relay helpers', async () => {
+    const directory = await makeRecipientDirectory();
+    const { FakeWebSocket: PublisherSocket } = createFakeWebSocket();
+    const published = await publishPeerChatMessage({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: directory,
+        origin: ORIGIN,
+        text: 'relay delivered chat',
+        currentTime: 1777766400,
+        rumorCreatedAt: 1777766300,
+        sealCreatedAt: 1777766200,
+        wrapCreatedAt: 1777766100,
+        sealNonce: hexToBytes('33'.repeat(32)),
+        wrapNonce: hexToBytes('44'.repeat(32)),
+        wrapperPrivateKeyHex: '0000000000000000000000000000000000000000000000000000000000000003',
+        WebSocketImpl: PublisherSocket,
+        timeoutMs: 100,
+    });
+    const liveShare = await buildLivePadPrivateShare({
+        senderMnemonic: SENDER_MNEMONIC,
+        recipientDirectory: directory,
+        origin: ORIGIN,
+        href: '/pad/#/2/pad/edit/example/',
+        mode: 'view',
+        sealNonce: hexToBytes('55'.repeat(32)),
+        wrapNonce: hexToBytes('66'.repeat(32)),
+        wrapperPrivateKeyHex: '0000000000000000000000000000000000000000000000000000000000000003',
+    });
+    const { FakeWebSocket: FetchSocket } = createFakeWebSocket({
+        events: [published.giftWrap, liveShare.giftWrap],
+    });
+
+    const inbox = await fetchAndOpenPeerChatMessages({
+        recipientMnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: published.relays,
+        origin: ORIGIN,
+        WebSocketImpl: FetchSocket,
+        timeoutMs: 100,
+    });
+    const shares = await fetchAndOpenLivePadPrivateShares({
+        recipientMnemonic: RECIPIENT_MNEMONIC,
+        relayUrls: published.relays,
+        origin: ORIGIN,
+        WebSocketImpl: FetchSocket,
+        timeoutMs: 100,
+    });
+
+    assert.equal(inbox.messages.length, 1);
+    assert.equal(inbox.failures.length, 0);
+    assert.equal(inbox.messages[0].payload.text, 'relay delivered chat');
+    assert.equal(shares.shares.length, 1);
+    assert.equal(shares.failures.length, 0);
 });

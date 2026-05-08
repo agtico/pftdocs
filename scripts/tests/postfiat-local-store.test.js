@@ -38,6 +38,10 @@ const makeStorage = () => ({
 const loadLocalStore = () => {
     const localStorage = makeStorage();
     const sessionStorage = makeStorage();
+    const events = {
+        cacheClears: 0,
+        localForageClears: 0,
+    };
     let LocalStore;
     const context = {
         console,
@@ -48,8 +52,15 @@ const loadLocalStore = () => {
             LocalStore = factory(
                 Constants,
                 { serializeHash: (hash) => hash, createRandomHash: () => '/anon/hash/' },
-                { clear: (cb) => cb && cb() },
-                { setItem() {}, getItem() {}, clear(cb) { if (cb) { cb(); } } },
+                { clear: (cb) => { events.cacheClears++; if (cb) { cb(); } } },
+                {
+                    setItem() {},
+                    getItem() {},
+                    clear(cb) {
+                        events.localForageClears++;
+                        if (cb) { cb(); }
+                    },
+                },
                 {},
                 { once: (fn) => {
                     let called = false;
@@ -64,7 +75,7 @@ const loadLocalStore = () => {
     };
     vm.createContext(context);
     vm.runInContext(localStoreSource, context);
-    return { LocalStore, localStorage, sessionStorage, window: context.window };
+    return { LocalStore, localStorage, sessionStorage, window: context.window, events };
 };
 
 test('password logins keep CryptPad persistent local storage behavior', () => {
@@ -101,7 +112,47 @@ test('wallet logins store the login capability in session storage only', () => {
     assert.equal(LocalStore.getAccountName(), 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
     assert.equal(localStorage[Constants.blockHashKey], undefined);
     assert.equal(localStorage[Constants.userNameKey], undefined);
+    assert.equal(localStorage.PFT_last_wallet_address, 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
     assert.equal(sessionStorage[Constants.blockHashKey], 'wallet-block');
+});
+
+test('wallet switching clears wallet-scoped caches but preserves browser provider settings', () => {
+    const { LocalStore, localStorage, sessionStorage, events } = loadLocalStore();
+
+    LocalStore.walletLogin(undefined, 'old-wallet-block', 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh');
+    localStorage.PFT_wallet_vault = '{"version":1}';
+    localStorage.PFT_ai_provider_keys_v1 = '{"ambient":"amb"}';
+    localStorage.PFT_ai_provider_settings_v1 = '{"provider":"ambient"}';
+    localStorage.PFT_runpod_api_key_v1 = '{"key":"rp"}';
+    localStorage.PFT_runpod_settings_v1 = '{"podName":"qwen"}';
+    localStorage.PFT_ai_chat_sessions_v1 = '[{"id":"old-chat"}]';
+    localStorage['PFT_tasknode_ipfs_json_v1:cid'] = '{"payload":"old"}';
+
+    LocalStore.walletLogin(undefined, 'new-wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+
+    assert.equal(localStorage.PFT_wallet_vault, '{"version":1}');
+    assert.equal(localStorage.PFT_last_wallet_address, 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    assert.equal(localStorage.PFT_ai_provider_keys_v1, '{"ambient":"amb"}');
+    assert.equal(localStorage.PFT_ai_provider_settings_v1, '{"provider":"ambient"}');
+    assert.equal(localStorage.PFT_runpod_api_key_v1, '{"key":"rp"}');
+    assert.equal(localStorage.PFT_runpod_settings_v1, '{"podName":"qwen"}');
+    assert.equal(localStorage.PFT_ai_chat_sessions_v1, undefined);
+    assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:cid'], undefined);
+    assert.equal(sessionStorage[Constants.blockHashKey], 'new-wallet-block');
+    assert.equal(events.localForageClears, 1);
+    assert.equal(events.cacheClears, 1);
+});
+
+test('same-wallet login does not clear wallet-scoped browser state', () => {
+    const { LocalStore, localStorage, events } = loadLocalStore();
+
+    LocalStore.walletLogin(undefined, 'wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+    localStorage.PFT_ai_provider_keys_v1 = '{"ambient":"amb"}';
+    LocalStore.walletLogin(undefined, 'wallet-block-2', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
+
+    assert.equal(localStorage.PFT_ai_provider_keys_v1, '{"ambient":"amb"}');
+    assert.equal(events.localForageClears, 0);
+    assert.equal(events.cacheClears, 0);
 });
 
 test('wallet login clears a stale unlocked signer for a different wallet', () => {
@@ -205,4 +256,34 @@ test('wallet lock clears only the current wallet session', () => {
     assert.equal(LocalStore.isLoggedIn(), false);
     assert.equal(sessionStorage[Constants.blockHashKey], undefined);
     assert.equal(sessionStorage.PFT_session_wallet, undefined);
+});
+
+test('logout preserves Post Fiat browser-local app secrets and cache', () => {
+    const { LocalStore, localStorage, sessionStorage } = loadLocalStore();
+
+    localStorage.PFT_wallet_vault = '{"version":1}';
+    localStorage.PFT_ai_provider_keys_v1 = '{"ambient":"amb","openrouter":"or"}';
+    localStorage.PFT_ai_provider_settings_v1 = '{"provider":"openrouter"}';
+    localStorage.PFT_runpod_api_key_v1 = '{"key":"rp"}';
+    localStorage.PFT_runpod_settings_v1 = '{"podName":"qwen"}';
+    localStorage.PFT_ai_chat_sessions_v1 = '[{"id":"chat"}]';
+    localStorage.PFT_ai_chat_options_v1 = '{"includeTasks":true}';
+    localStorage['PFT_tasknode_ipfs_json_v1:index'] = '[{"cid":"bafy"}]';
+    localStorage['PFT_tasknode_ipfs_json_v1:bafy'] = '{"payload":"encrypted"}';
+    localStorage.unrelated = 'remove-me';
+    sessionStorage.PFT_wallet_session = '1';
+
+    LocalStore.logout();
+
+    assert.equal(localStorage.PFT_wallet_vault, '{"version":1}');
+    assert.equal(localStorage.PFT_ai_provider_keys_v1, '{"ambient":"amb","openrouter":"or"}');
+    assert.equal(localStorage.PFT_ai_provider_settings_v1, '{"provider":"openrouter"}');
+    assert.equal(localStorage.PFT_runpod_api_key_v1, '{"key":"rp"}');
+    assert.equal(localStorage.PFT_runpod_settings_v1, '{"podName":"qwen"}');
+    assert.equal(localStorage.PFT_ai_chat_sessions_v1, '[{"id":"chat"}]');
+    assert.equal(localStorage.PFT_ai_chat_options_v1, '{"includeTasks":true}');
+    assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:index'], '[{"cid":"bafy"}]');
+    assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:bafy'], '{"payload":"encrypted"}');
+    assert.equal(localStorage.unrelated, undefined);
+    assert.equal(sessionStorage.PFT_wallet_session, undefined);
 });

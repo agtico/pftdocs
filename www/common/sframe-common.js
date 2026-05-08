@@ -1009,7 +1009,7 @@ define([
                 }
                 var blocked = privateData.premiumOnly && privateData.isNewFile;
                 if (blocked) {
-                    var domain = ApiConfig.httpUnsafeOrigin || 'CryptPad';
+                    var domain = ApiConfig.httpUnsafeOrigin || 'PFT Docs';
                     if (/^http/.test(domain)) { domain = domain.replace(/^https?\:\/\//, ''); }
                     UI.errorLoadingScreen(Messages._getKey('premiumOnly', [domain]), null, function () {
                         funcs.gotoURL('/drive/');

@@ -392,6 +392,80 @@ export const buildPrivateShareRumor = ({
     content: serializePrivateShareEnvelope(envelope),
 });
 
+export const buildNostrPrivateDirectMessageRumor = ({
+    senderPublicKeyHex,
+    recipientPublicKeyHex,
+    recipientRelay,
+    tags,
+    content,
+    createdAt,
+} = {}) => buildUnsignedNostrEvent({
+    pubkey: senderPublicKeyHex,
+    createdAt,
+    kind: NOSTR_KIND_PRIVATE_DIRECT_MESSAGE,
+    tags: [
+        pTag(recipientPublicKeyHex, recipientRelay),
+    ].concat(normalizeNostrTags(tags)),
+    content,
+});
+
+export const buildNostrPrivateDirectMessageGiftWrap = ({
+    senderPrivateKeyHex,
+    recipientPublicKeyHex,
+    recipientRelay,
+    tags,
+    content,
+    currentTime,
+    rumorCreatedAt,
+    sealCreatedAt,
+    wrapCreatedAt,
+    sealNonce,
+    wrapNonce,
+    wrapperPrivateKeyHex,
+} = {}) => {
+    const senderPublicKeyHex = getNostrPublicKeyHex(senderPrivateKeyHex);
+    const wrapperSecret = wrapperPrivateKeyHex ||
+        bytesToHex(schnorr.utils.randomSecretKey());
+    const current = currentTime || nowSeconds();
+    const rumor = buildNostrPrivateDirectMessageRumor({
+        senderPublicKeyHex,
+        recipientPublicKeyHex,
+        recipientRelay,
+        tags,
+        content,
+        createdAt: rumorCreatedAt || randomPastTimestamp(current),
+    });
+    const seal = signNostrEvent({
+        kind: NOSTR_KIND_SEAL,
+        tags: [],
+        content: encryptNip44ToPublicKey({
+            plaintext: JSON.stringify(rumor),
+            senderPrivateKeyHex,
+            recipientPublicKeyHex,
+            nonce: sealNonce,
+        }),
+        created_at: sealCreatedAt || randomPastTimestamp(current),
+    }, senderPrivateKeyHex);
+    const giftWrap = signNostrEvent({
+        kind: NOSTR_KIND_GIFT_WRAP,
+        tags: [pTag(recipientPublicKeyHex, recipientRelay)],
+        content: encryptNip44ToPublicKey({
+            plaintext: JSON.stringify(seal),
+            senderPrivateKeyHex: wrapperSecret,
+            recipientPublicKeyHex,
+            nonce: wrapNonce,
+        }),
+        created_at: wrapCreatedAt || randomPastTimestamp(current),
+    }, wrapperSecret);
+
+    return {
+        rumor,
+        seal,
+        giftWrap,
+        relays: recipientRelay ? [String(recipientRelay)] : [],
+    };
+};
+
 export const buildPrivateShareGiftWrap = ({
     senderPrivateKeyHex,
     recipientPublicKeyHex,
@@ -451,7 +525,7 @@ export const buildPrivateShareGiftWrap = ({
     };
 };
 
-export const unwrapPrivateShareGiftWrap = ({
+export const unwrapNostrPrivateDirectMessageGiftWrap = ({
     giftWrap,
     recipientPrivateKeyHex,
 } = {}) => {
@@ -484,8 +558,23 @@ export const unwrapPrivateShareGiftWrap = ({
         giftWrap,
         seal,
         rumor,
-        envelope: parsePrivateShareEnvelope(rumor.content),
         senderPublicKeyHex: normalizeNostrPublicKeyHex(seal.pubkey),
         recipientPublicKeyHex: getNostrPublicKeyHex(recipientPrivateKeyHex),
+    };
+};
+
+export const unwrapPrivateShareGiftWrap = (options = {}) => {
+    const opened = unwrapNostrPrivateDirectMessageGiftWrap(options);
+    const hasPrivateShareTag = (opened.rumor.tags || []).some((tag) =>
+        tag[0] === 'postfiat' &&
+        tag[1] === POSTFIAT_PRIVATE_SHARE_TAG &&
+        tag[2] === POSTFIAT_PRIVATE_SHARE_TAG_VERSION
+    );
+    if (!hasPrivateShareTag) {
+        throw new Error('NOT_PRIVATE_SHARE_MESSAGE');
+    }
+    return {
+        ...opened,
+        envelope: parsePrivateShareEnvelope(opened.rumor.content),
     };
 };

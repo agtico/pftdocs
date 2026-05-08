@@ -3858,6 +3858,17 @@ define([
             return Array.isArray(relays) ? relays : [];
         };
 
+        var getPostFiatNostrOrigin = function () {
+            var nostr = (ApiConfig.postFiat && ApiConfig.postFiat.nostr) || {};
+            var configured = nostr.origin || ApiConfig.httpUnsafeOrigin;
+            var fallback = '';
+            try {
+                fallback = metadataMgr.getPrivateData().origin;
+            } catch (err) {}
+            return String(configured || fallback || window.location.origin ||
+                'postfiat://cryptpad').replace(/\/+$/u, '');
+        };
+
         var parsePostFiatRelayInput = function (value) {
             return String(value || '').split(/[\s,]+/u)
                 .map(function (relay) { return relay.trim(); })
@@ -4064,7 +4075,7 @@ define([
 	                    return runPostFiatWalletShareAction('FETCH_AND_OPEN_LIVE_PAD_PRIVATE_SHARES', {
 	                        relayUrls: relayList,
 	                        fallbackRelays: relayList,
-	                        origin: metadataMgr.getPrivateData().origin || window.location.origin,
+	                        origin: getPostFiatNostrOrigin(),
                         limit: 50,
                         timeoutMs: 10000
                     });

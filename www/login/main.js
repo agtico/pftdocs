@@ -216,6 +216,24 @@ define([
                 return Core.requestSessionWallet({ timeoutMs: timeoutMs || 1500 });
             });
         };
+        var walletSwitchPrepared;
+        var prepareWalletSwitch = function () {
+            if (!switchWalletLogin) { return Promise.resolve(); }
+            if (walletSwitchPrepared) { return walletSwitchPrepared; }
+
+            var Core = getWalletCore(true);
+            var clearSigner = Core && typeof(Core.clearSessionWallet) === 'function' ?
+                Promise.resolve(Core.clearSessionWallet()) : Promise.resolve();
+
+            walletSwitchPrepared = clearSigner.catch(function (err) {
+                console.error(err);
+            }).then(function () {
+                if (LocalStore.lockWallet) {
+                    LocalStore.lockWallet();
+                }
+            });
+            return walletSwitchPrepared;
+        };
         var assertWalletMatchesAccount = function (wallet) {
             var accountName = LocalStore.getAccountName && LocalStore.getAccountName();
             if (accountName && wallet && wallet.address && accountName !== wallet.address) {
@@ -223,6 +241,12 @@ define([
             }
         };
         var refreshSavedWallet = function () {
+            if (switchWalletLogin) {
+                $savedWallet.addClass('cp-hidden');
+                $walletPassword.val('');
+                setSeedRecoveryVisible(true);
+                return;
+            }
             var Core = getWalletCore(true);
             if (!Core || !Core.getSavedWalletMeta) { return; }
             try {
@@ -277,6 +301,7 @@ define([
         };
         var continueWithExistingSession = async function (options) {
             options = options || {};
+            if (switchWalletLogin) { return false; }
             var Core = getWalletCore(!options.warn);
             if (!Core) { return false; }
             var showSessionPanel = forceWalletVault && $savedWallet.hasClass('cp-hidden');
@@ -324,6 +349,7 @@ define([
             };
         };
         var loginWithMnemonic = async function (Core, mnemonic, shouldImport) {
+            await prepareWalletSwitch();
             var wallet = Core.deriveWalletFromMnemonic(mnemonic);
             var message = WalletAuth.getLoginMessage(wallet.address);
             var signed = Core.signMessage(mnemonic, message);
@@ -445,6 +471,9 @@ define([
         var savedWalletLogin = async function () {
             var Core = getWalletCore();
             if (!Core) { return; }
+            if (switchWalletLogin) {
+                return void UI.warn('Use the seed phrase to switch wallets.');
+            }
 
             try {
                 var password = $walletPassword.val();
@@ -471,7 +500,9 @@ define([
         refreshSavedWallet();
         refreshSavePassword();
         var focusDefault = function () {
-            if (!legacyDisabled && (!walletFirst || forceLegacyLogin)) {
+            if (switchWalletLogin) {
+                $walletMnemonic.focus();
+            } else if (!legacyDisabled && (!walletFirst || forceLegacyLogin)) {
                 $uname.focus();
             } else if (!$savedWallet.hasClass('cp-hidden')) {
                 $walletPassword.focus();
@@ -484,6 +515,10 @@ define([
                 continueWithExistingSession({ timeoutMs: 2000 }).then(function (redirecting) {
                     if (!redirecting) { focusDefault(); }
                 });
+                return;
+            }
+            if (switchWalletLogin) {
+                prepareWalletSwitch().then(focusDefault);
                 return;
             }
             redirectIfWalletSessionUnlocked().then(function (redirecting) {

@@ -23,3 +23,29 @@ test('Post Fiat Nostr relays are allowed by CSP connect-src', () => {
     assert.doesNotMatch(csp, /relay\.example\/path/u);
     assert.doesNotMatch(csp, /relay-proxy\.example\/api/u);
 });
+
+test('Post Fiat AI providers are allowed by CSP connect-src', () => {
+    const csp = Default.postFiatContentSecurity({
+        httpUnsafeOrigin: 'https://docs.example',
+        httpSafeOrigin: 'https://sandbox.example',
+        postFiat: {
+            ai: {},
+        },
+    });
+
+    assert.match(csp, /connect-src[^;]+https:\/\/api\.ambient\.xyz/u);
+    assert.match(csp, /connect-src[^;]+https:\/\/openrouter\.ai/u);
+    assert.match(csp, /connect-src[^;]+https:\/\/\*\.proxy\.runpod\.net/u);
+});
+
+test('Post Fiat app CSP allows wallet decryption WebAssembly', () => {
+    const csp = Default.postFiatContentSecurity({
+        httpUnsafeOrigin: 'https://docs.example',
+        httpSafeOrigin: 'https://sandbox.example',
+        postFiat: {},
+    });
+
+    assert.match(csp, /script-src[^;]+'wasm-unsafe-eval'/u);
+    assert.doesNotMatch(csp, /script-src[^;]+'unsafe-eval'/u);
+    assert.doesNotMatch(csp, /script-src[^;]+'unsafe-inline'/u);
+});

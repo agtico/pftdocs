@@ -10,11 +10,9 @@ define([
     '/customize/lucide.js',
     'less!/customize/src/less2/include/loading.less'
 ], function (Messages, Lucide) {
-    var urlArgs = window.location.href.replace(/^.*\?([^\?]*)$/, function (all, x) { return x; });
     var elem = document.createElement('div');
     elem.setAttribute('id', 'cp-loading');
 
-    const logoPath = '/customize/CryptPad_logo_grey.svg';// XXX custom
     elem.innerHTML = `
 <div></div>
 <div class="cp-loading-container">
@@ -30,7 +28,7 @@ define([
 </div>
 <div id="cp-loading-footer">
     <div class="cp-loading-logo">
-        <img class="cp-loading-cryptofist" src="${logoPath}?${urlArgs}" alt="" aria-hidden="true"><span>CryptPad</span>
+        <span class="cp-loading-mark" aria-hidden="true">PF</span><span>PFT Docs</span>
     </div>
     <div id="cp-loading-status">
         <i data-lucide="lock" aria-hidden="true"></i>

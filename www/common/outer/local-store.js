@@ -13,8 +13,31 @@ define([
     var LocalStore = {};
     var pftWalletSessionKey = 'PFT_wallet_session';
     var pftSessionWalletStorageKey = 'PFT_session_wallet';
+    var pftLastWalletAddressKey = 'PFT_last_wallet_address';
     var pftWalletAddressPattern = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
     var walletSessionResponder;
+    var postFiatPreservedLocalKeys = [
+        'PFT_wallet_vault',
+        pftLastWalletAddressKey,
+        'PFT_ai_provider_keys_v1',
+        'PFT_ai_provider_settings_v1',
+        'PFT_runpod_api_key_v1',
+        'PFT_runpod_settings_v1',
+        'PFT_ai_chat_sessions_v1',
+        'PFT_ai_chat_options_v1',
+        'PFT_tasknode_ipfs_json_v1:index',
+    ];
+    var postFiatWalletSwitchPreservedLocalKeys = [
+        'PFT_wallet_vault',
+        pftLastWalletAddressKey,
+        'PFT_ai_provider_keys_v1',
+        'PFT_ai_provider_settings_v1',
+        'PFT_runpod_api_key_v1',
+        'PFT_runpod_settings_v1',
+    ];
+    var postFiatPreservedLocalPrefixes = [
+        'PFT_tasknode_ipfs_json_v1:',
+    ];
 
     var safeSet = function (key, val) {
         try {
@@ -66,6 +89,15 @@ define([
             pftSessionWalletStorageKey,
         ].concat(walletLoginSessionKeys));
     };
+    var shouldPreservePostFiatLocalKey = function (key) {
+        if (postFiatPreservedLocalKeys.indexOf(key) !== -1) { return true; }
+        return postFiatPreservedLocalPrefixes.some(function (prefix) {
+            return key.indexOf(prefix) === 0;
+        });
+    };
+    var shouldPreservePostFiatWalletSwitchLocalKey = function (key) {
+        return postFiatWalletSwitchPreservedLocalKeys.indexOf(key) !== -1;
+    };
     var removeMismatchedSessionWallet = function (name) {
         var raw = sessionStorage[pftSessionWalletStorageKey];
         var record;
@@ -81,6 +113,60 @@ define([
     };
     var isWalletAddress = function (name) {
         return typeof(name) === 'string' && pftWalletAddressPattern.test(name);
+    };
+    var isPostFiatWalletScopedLocalKey = function (key) {
+        if (shouldPreservePostFiatWalletSwitchLocalKey(key)) {
+            return false;
+        }
+        return /^PFT_/.test(String(key || ''));
+    };
+    var hasPostFiatWalletScopedLocalState = function () {
+        try {
+            return Object.keys(localStorage || {}).some(isPostFiatWalletScopedLocalKey);
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+    };
+    var removePostFiatWalletScopedLocalState = function () {
+        try {
+            Object.keys(localStorage || {}).forEach(function (key) {
+                if (!isPostFiatWalletScopedLocalKey(key)) { return; }
+                localStorage.removeItem(key);
+                delete localStorage[key];
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    };
+    var clearPostFiatWalletSwitchStores = function (cb) {
+        cb = Util.once(cb || function () {});
+        removePostFiatWalletScopedLocalState();
+        try {
+            localForage.clear(function () {
+                try {
+                    Cache.clear(cb);
+                } catch (err) {
+                    console.error(err);
+                    cb();
+                }
+            });
+        } catch (err) {
+            console.error(err);
+            try {
+                Cache.clear(cb);
+            } catch (cacheErr) {
+                console.error(cacheErr);
+                cb();
+            }
+        }
+    };
+    var shouldClearPostFiatWalletSwitchStores = function (nextName) {
+        var currentName = LocalStore.getAccountName && LocalStore.getAccountName();
+        var lastName = localStorage[pftLastWalletAddressKey];
+        if (isWalletAddress(currentName) && currentName !== nextName) { return true; }
+        if (isWalletAddress(lastName) && lastName !== nextName) { return true; }
+        return !isWalletAddress(lastName) && hasPostFiatWalletScopedLocalState();
     };
     var hasWalletSession = function () {
         return sessionStorage[pftWalletSessionKey] === '1';
@@ -256,15 +342,23 @@ define([
     LocalStore.walletLogin = function (userHash, blockHash, name, cb) {
         if (!userHash && !blockHash) { throw new Error('expected a user hash'); }
         if (!name) { throw new Error('expected a user name'); }
+        var clearSwitchStores = shouldClearPostFiatWalletSwitchStores(name);
+        var finishLogin = function () {
+            safeSet(pftLastWalletAddressKey, name);
+            safeSessionSet(pftWalletSessionKey, '1');
+            if (userHash) { safeSessionSet(Constants.userHashKey, Hash.serializeHash(userHash)); }
+            if (blockHash) { safeSessionSet(Constants.blockHashKey, blockHash); }
+            safeSessionSet(Constants.userNameKey, name);
+            startWalletSessionResponder();
+            if (cb) { cb(); }
+        };
         removeLocalLogin();
         removeWalletLoginSession();
         removeMismatchedSessionWallet(name);
-        safeSessionSet(pftWalletSessionKey, '1');
-        if (userHash) { safeSessionSet(Constants.userHashKey, Hash.serializeHash(userHash)); }
-        if (blockHash) { safeSessionSet(Constants.blockHashKey, blockHash); }
-        safeSessionSet(Constants.userNameKey, name);
-        startWalletSessionResponder();
-        if (cb) { cb(); }
+        if (clearSwitchStores) {
+            return void clearPostFiatWalletSwitchStores(finishLogin);
+        }
+        finishLogin();
     };
     LocalStore.lockWallet = function (cb) {
         removeWalletSession();
@@ -290,7 +384,11 @@ define([
         try {
             Object.keys(localStorage || {}).forEach(function (k) {
                 // Remvoe everything in localStorage except CACHE and FS_hash
-                if (/^CRYPTPAD_CACHE/.test(k) || /^LESS_CACHE/.test(k) || k === Constants.fileHashKey || /^CRYPTPAD_STORE|colortheme/.test(k)) { return; }
+                if (typeof(localStorage[k]) === 'function') { return; }
+                if (/^CRYPTPAD_CACHE/.test(k) || /^LESS_CACHE/.test(k) ||
+                        k === Constants.fileHashKey ||
+                        /^CRYPTPAD_STORE|colortheme/.test(k) ||
+                        shouldPreservePostFiatLocalKey(k)) { return; }
                 delete localStorage[k];
             });
         } catch (e) { console.error(e); }

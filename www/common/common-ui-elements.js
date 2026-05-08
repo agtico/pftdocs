@@ -26,8 +26,6 @@ define([
 ], function ($, Config, Broadcast, Util, Hash, Language, UI, Constants, Feedback, h, Clipboard,
              Messages, AppConfig, Pages, NThen, InviteInner, Visible, PadTypes, Icons) {
     var UIElements = {};
-    var urlArgs = Config.requireConf.urlArgs;
-
     UIElements.getSvgLogo = function () {
         var svg = (function(){/*
 <svg width="45" height="50" version="1.1" viewBox="0 0 11.906 13.229" xmlns="http://www.w3.org/2000/svg">
@@ -462,7 +460,7 @@ define([
                 h('div.cp-teams-invite-block', [
                     h('span', Messages.team_inviteLinkSetPassword),
                     h('a.cp-teams-help', {
-                        href: Pages.localizeDocsLink('https://docs.cryptpad.org/en/user_guide/security.html#passwords-for-documents-and-folders'),
+                        href: '/app/#docs',
                         target: "_blank",
                         'data-tippy-placement': "right"
                     }, Icons.get('circle-question'))
@@ -1387,14 +1385,13 @@ define([
             diagram: 'diagram',
         };
 
-        var href = "https://docs.cryptpad.org/en/user_guide/applications.html";
+        var href = "/app/#docs";
         if (apps[type]) {
-            href = "https://docs.cryptpad.org/en/user_guide/apps/" + apps[type] + ".html";
+            href = "/app/#docs";
         }
         if (type === 'drive') {
-            href = "https://docs.cryptpad.org/en/user_guide/drive.html";
+            href = "/app/#docs";
         }
-        href = Pages.localizeDocsLink(href);
 
         var content = setHTML(h('p'), Messages.help_genericMore);
         $(content).find('a').attr({
@@ -2071,11 +2068,10 @@ define([
 
         var content = h('div.cp-info-menu-container', [
                 h('div.logo-block', [
-                    h('img', {
-                        src: '/customize/CryptPad_logo.svg?' + urlArgs,
-                        alt: Messages.label_logo
-                    }),
-                h('h6', "CryptPad"),
+                    h('span.cp-brand-mark', {
+                        'aria-label': Messages.label_logo,
+                    }, 'PF'),
+                h('h6', "PFT Docs"),
                 h('span', Pages.versionString)
             ]),
             h('hr'),
@@ -2118,11 +2114,8 @@ define([
             tag: 'div',
             attributes: {'class': 'cp-user-menu-logo'},
             content: h('span', [
-                h('img', {
-                    src: '/customize/CryptPad_logo_grey.svg',
-                    "aria-hidden": true,
-                }),
-                h('span.cp-user-menu-logo-text', "CryptPad")
+                h('span.cp-brand-mark', { "aria-hidden": true }, 'PF'),
+                h('span.cp-user-menu-logo-text', "PFT Docs")
             ]),
         });
         if (config.displayNameCls) {
@@ -2250,7 +2243,7 @@ define([
             attributes: {
                 'target': '_blank',
                 'rel': 'noopener',
-                'href': 'https://docs.cryptpad.org',
+                'href': '/app/#docs',
             },
             content: h('span', [Icons.get('documentation')], Messages.docs_link)
         });
@@ -2746,19 +2739,13 @@ define([
 
         var $body = $('body');
         var $creationContainer = $('<div>', { id: 'cp-creation-container' }).appendTo($body);
-        var urlArgs = (Config.requireConf && Config.requireConf.urlArgs) || '';
-
         var fill1 = h('div.cp-creation-fill');
         var fill2 = h('div.cp-creation-fill', [
 
             h('div#cp-creation-footer', [
                 h('div#cp-creation-logo', [
-                    h('img', {
-                        src:`/customize/CryptPad_logo_grey.svg?${urlArgs}`,
-                        alt: '',
-                        'aria-hidden': true
-                    }),
-                    h('span', 'CryptPad')
+                    h('span.cp-brand-mark', { 'aria-hidden': true }, 'PF'),
+                    h('span', 'PFT Docs')
                 ]),
                 h('div#cp-creation-status', [
                     Icons.get('lock'),
@@ -2780,14 +2767,14 @@ define([
         var newPadH3Title = Messages._getKey('creation_new',[Messages.type[type]]);
 
         var early = common.checkRestrictedApp(type);
-        var domain = Config.httpUnsafeOrigin || 'CryptPad';
+        var domain = Config.httpUnsafeOrigin || 'PFT Docs';
         if (/^http/.test(domain)) { domain = domain.replace(/^https?\:\/\//, ''); }
 
         var title = h('div.cp-creation-title', [
             UI.getFileIcon({type: type}),
             h('div.cp-creation-title-text', [
                 h('span', newPadH3Title),
-                createHelper(Pages.localizeDocsLink('https://docs.cryptpad.org/en/user_guide/apps/general.html#new-document'), Messages.creation_helperText)
+                createHelper('/app/#docs', Messages.creation_helperText)
             ])
         ]);
         $creation.append(title);

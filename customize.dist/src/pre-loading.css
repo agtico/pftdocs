@@ -37,7 +37,7 @@
     bottom: 0px;
     left: 0px;
     right: 0px;
-    background-color: #EEEEEE; /* @cp_loading-bg */
+    background-color: #EEE; /* @cp_loading-bg */
     color: #757575; /* grey_600 */
     font-size: 1.3em;
     line-height: 120%;
@@ -60,6 +60,19 @@ html #placeholder.dark-theme {
     align-items: center;
     gap: 1rem;
     color: #939393;
+}
+#placeholder .placeholder-logo-container .placeholder-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border: 1px solid currentcolor;
+    border-radius: 8px;
+    font-size: 22px;
+    font-family: "IBM Plex Mono";
+    font-weight: 500;
+    letter-spacing: 0;
 }
 #placeholder .placeholder-logo-container img {
     margin: 0;
@@ -127,6 +140,11 @@ html #placeholder.dark-theme {
     #placeholder .placeholder-logo-container img {
         max-height: 40px;
     }
+    #placeholder .placeholder-logo-container .placeholder-mark {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
     #placeholder .placeholder-logo-container span {
         font-size: 20px;
     }
@@ -149,4 +167,3 @@ html #placeholder.dark-theme {
     color: #eee;
     border-radius: 5px;
 }
-

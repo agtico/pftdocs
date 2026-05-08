@@ -81,7 +81,7 @@
                 }
             }
             .cp-form-input-block {
-                input { color: @color !important; }
+                input { color: @color !important; }
                 border-bottom-color: @color !important;
             }
         }
@@ -224,6 +224,18 @@
                 img {
                     max-height: 60px;
                     margin: 0px 20px;
+                }
+                .cp-brand-mark {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 58px;
+                    height: 58px;
+                    margin: 0px 20px;
+                    border: 1px solid currentcolor;
+                    border-radius: 8px;
+                    font-size: 22px;
+                    letter-spacing: 0;
                 }
             }
         }
@@ -392,7 +404,7 @@
                         margin-bottom: 10px;
                         flex-wrap: wrap;
                         gap:0.5rem;
-                        .cp-dropdown-container button {
+                        .cp-dropdown-container button {
                             max-width: 200px;
                             overflow: hidden;
                             text-overflow: ellipsis;
@@ -512,7 +524,7 @@
                             width: @variables_icon_width;
                             height: @variables_icon_height;
                         }
-                        .add-close { display: none; }
+                        .add-close { display: none; }
                         &.displayed {
                             .add-close { display: inline; }
                             .add-open { display: none; }
@@ -901,7 +913,7 @@
                     display: flex;
                     align-items: center;
                     margin-bottom: 10px;
-                    input {
+                    input {
                         width: 100px;
                         margin-left: 10px;
                     }
@@ -1552,4 +1564,3 @@
 
     .charts_main();
 }
-

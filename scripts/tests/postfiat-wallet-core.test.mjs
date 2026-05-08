@@ -9,6 +9,7 @@ import {
     DEFAULT_DERIVATION_PATH,
     SESSION_WALLET_STORAGE_KEY,
     WALLET_VAULT_STORAGE_KEY,
+    buildPftPaymentTransaction,
     clearSavedWallet,
     clearSessionWallet,
     createMnemonic,
@@ -18,14 +19,21 @@ import {
     decodeTaskNodePointerMemo,
     deriveWalletFromMnemonic,
     deriveTaskNodeX25519KeypairFromMnemonic,
+    dropsToPft,
     encodeTaskNodePublicKey,
     encryptMnemonicVault,
     encryptTaskNodePayloadForTests,
     extractTaskNodePointerEvents,
+    extractTaskNodeReadableText,
+    fetchPftBalance,
     getSavedWalletMeta,
     isValidMnemonic,
+    loadIndexedTaskNodeHistory,
     messageToHex,
+    normalizeIndexedTaskNodeSnapshot,
     normalizeMnemonic,
+    normalizePftAmountValue,
+    pftToDrops,
     saveWallet,
     restoreSessionWallet,
     requestSessionWallet,
@@ -164,6 +172,37 @@ test('decrypts Task Node X25519 payloads with the wallet mnemonic', async () => 
     });
 });
 
+test('extracts readable text from Task Node payload envelopes', () => {
+    assert.equal(extractTaskNodeReadableText({
+        schema: 'pf.reward.v1',
+        reward_summary: 'Strong execution with clear evidence.',
+        task_id: 'task-1',
+    }), 'Strong execution with clear evidence.');
+
+    assert.equal(extractTaskNodeReadableText({
+        phase: 'submission',
+        artifact: {
+            codeSnippet: 'function ship() { return true; }',
+        },
+    }), 'function ship() { return true; }');
+
+    assert.equal(extractTaskNodeReadableText({
+        artifacts: [{
+            evidence_type: 'screenshot',
+            image_description: 'Screenshot shows the completed task flow.',
+            artifact: {
+                fileName: 'done.png',
+                mimeType: 'image/png',
+            },
+        }, {
+            evidence_type: 'text',
+            artifact: {
+                response: 'Published the public writeup.',
+            },
+        }],
+    }), 'Screenshot shows the completed task flow.\n\nPublished the public writeup.');
+});
+
 test('rejects Task Node blobs with mismatched content hashes', async () => {
     const keypair = await deriveTaskNodeX25519KeypairFromMnemonic(TEST_MNEMONIC);
     const publicKey = await encodeTaskNodePublicKey(keypair.publicKey);
@@ -241,6 +280,123 @@ test('extracts task and context pointer events from account_tx rows', () => {
     assert.equal(events.find((event) => event.kindLabel === 'TASK_SUBMISSION').taskId, 'task-123');
 });
 
+test('normalizes indexed pftasks rows into Task Node history events', () => {
+    const normalized = normalizeIndexedTaskNodeSnapshot({
+        walletAddress: TEST_ADDRESS,
+        contextRevisions: [{
+            id: 'context-1',
+            cid: 'bafk-context-1',
+            tx_hash: 'CTXHASH',
+            word_count: 42,
+            created_at: '2026-04-25T16:40:12.053Z',
+        }],
+        tasks: [{
+            id: 'task-1',
+            title: 'Ship indexed bridge',
+            status: 'rewarded',
+            verification_type: 'code',
+        }],
+        taskEvents: [{
+            id: 'event-1',
+            task_id: 'task-1',
+            event_type: 'submission_recorded',
+            event_payload: {
+                artifact_cid: 'bafk-submission-1',
+                artifact_type: 'text',
+            },
+            pftl_tx_hash: 'SUBMITTX',
+            created_at: '2026-04-26T00:00:00.000Z',
+        }],
+    });
+
+    assert.equal(normalized.contextEvents.length, 1);
+    assert.equal(normalized.contextEvents[0].kindLabel, 'CONTEXT');
+    assert.equal(normalized.contextEvents[0].wordCount, 42);
+    assert.equal(normalized.taskEvents.length, 1);
+    assert.equal(normalized.taskEvents[0].cid, 'bafk-submission-1');
+    assert.equal(normalized.taskEvents[0].kindLabel, 'TASK_SUBMISSION');
+    assert.equal(normalized.taskEvents[0].title, 'Ship indexed bridge');
+});
+
+test('loads indexed pftasks rows and decrypts IPFS payloads with the wallet mnemonic', async () => {
+    const keypair = await deriveTaskNodeX25519KeypairFromMnemonic(TEST_MNEMONIC);
+    const publicKey = await encodeTaskNodePublicKey(keypair.publicKey);
+    const contextBlob = await encryptTaskNodePayloadForTests({
+        plaintext: 'Post Fiat Operating Brief\n\nCurrent sprint: indexed bridge.',
+        recipientPublicKeys: [publicKey],
+    });
+    const submissionBlob = await encryptTaskNodePayloadForTests({
+        plaintext: JSON.stringify({
+            task_id: 'task-1',
+            phase: 'submission',
+            artifact_type: 'text',
+            response: 'Implemented indexed Task Node importer.',
+        }),
+        recipientPublicKeys: [publicKey],
+    });
+    const payloads = new Map([
+        ['bafk-context-1', contextBlob],
+        ['bafk-submission-1', submissionBlob],
+    ]);
+
+    const history = await loadIndexedTaskNodeHistory({
+        mnemonic: TEST_MNEMONIC,
+        walletAddress: TEST_ADDRESS,
+        indexedData: {
+            context_revisions: [{
+                cid: 'bafk-context-1',
+                tx_hash: 'CTXHASH',
+                created_at: '2026-04-25T16:40:12.053Z',
+            }],
+            tasks: [{
+                id: 'task-1',
+                title: 'Ship indexed bridge',
+                verification_type: 'code',
+                status: 'rewarded',
+            }],
+            task_events: [{
+                id: 'event-1',
+                task_id: 'task-1',
+                event_type: 'submission_recorded',
+                event_payload: JSON.stringify({
+                    artifact_cid: 'bafk-submission-1',
+                    artifact_type: 'text',
+                }),
+                pftl_tx_hash: 'SUBMITTX',
+                created_at: '2026-04-26T00:00:00.000Z',
+            }],
+        },
+        fetchIpfsJson: async ({ cid }) => {
+            if (!payloads.has(cid)) {
+                throw new Error(`missing cid ${cid}`);
+            }
+            return payloads.get(cid);
+        },
+    });
+
+    assert.equal(history.walletAddress, TEST_ADDRESS);
+    assert.equal(history.source.indexed, 'pftasks');
+    assert.equal(history.taskEventCount, 1);
+    assert.equal(history.contextUpdateCount, 1);
+    assert.equal(history.latestContext.decrypted, true);
+    assert.match(history.latestContext.text, /Operating Brief/);
+    assert.equal(history.tasks.length, 1);
+    assert.equal(history.tasks[0].taskId, 'task-1');
+    assert.equal(history.tasks[0].latest.summary.preview,
+        'Implemented indexed Task Node importer.');
+    assert.equal(history.taskHydrationFailures.length, 0);
+    assert.equal(history.contextHydrationFailures.length, 0);
+});
+
+test('rejects indexed Task Node history for a different wallet', async () => {
+    await assert.rejects(() => loadIndexedTaskNodeHistory({
+        mnemonic: TEST_MNEMONIC,
+        walletAddress: 'rDifferentWallet111111111111111111111',
+        indexedData: {},
+        fetchIpfsJson: async () => ({}),
+    }), /POSTFIAT_WALLET_ACCOUNT_MISMATCH/);
+});
+
 test('signs and verifies canonical Post Fiat access messages', () => {
     const signed = signMessage(TEST_MNEMONIC, TEST_ACCESS_MESSAGE);
 
@@ -260,6 +416,50 @@ test('signs and verifies canonical Post Fiat access messages', () => {
         publicKey: signed.publicKey,
         address: signed.address,
     }), false);
+});
+
+test('normalizes native PFT balances and payment transactions', async () => {
+    assert.equal(normalizePftAmountValue('10.0000'), '10');
+    assert.equal(normalizePftAmountValue('0.5000'), '0.5');
+    assert.equal(pftToDrops('10.25'), '10250000');
+    assert.equal(dropsToPft('10250000'), '10.25');
+
+    const balance = await fetchPftBalance({
+        walletAddress: TEST_ADDRESS,
+        fetchRpc: async ({ method, params }) => {
+            assert.equal(method, 'account_info');
+            assert.equal(params[0].account, TEST_ADDRESS);
+            return {
+                result: {
+                    account_data: {
+                        Account: TEST_ADDRESS,
+                        Balance: '9750000',
+                        Sequence: 7,
+                    },
+                },
+            };
+        },
+    });
+
+    assert.equal(balance.balance, '9.75');
+    assert.equal(balance.balanceDrops, '9750000');
+    assert.equal(balance.found, true);
+
+    const tx = buildPftPaymentTransaction({
+        account: TEST_ADDRESS,
+        destination: 'rf1Xs7YGJpz1YzU9prwXhSrhz21v2LhtXV',
+        amount: '10.000',
+        currency: 'PFT',
+        sequence: 7,
+        networkId: 2025,
+        lastLedgerSequence: 100,
+        memoText: 'peer transfer',
+    });
+
+    assert.equal(tx.TransactionType, 'Payment');
+    assert.equal(tx.Amount, '10000000');
+    assert.equal(tx.NetworkID, 2025);
+    assert.equal(tx.Memos[0].Memo.MemoType, messageToHex('pftdocs.peer-payment'));
 });
 
 test('encrypts and decrypts a saved wallet vault', async () => {

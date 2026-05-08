@@ -3321,11 +3321,8 @@ define([
 
     var getLogo = function () {
         var logo = h('div.cp-form-view-logo', [
-            h('img', {
-                src:'/customize/CryptPad_logo_grey.svg?'+ApiConfig.requireConf.urlArgs,
-                alt:'CryptPad_logo'
-            }),
-            h('span', 'CryptPad')
+            h('span.cp-brand-mark', { 'aria-hidden': true }, 'PF'),
+            h('span', 'PFT Docs')
         ]);
         $(logo).click(function () {
             APP.framework._.sfCommon.gotoURL('/');

@@ -20,7 +20,7 @@ define(['/api/config'], function (ApiConfig) {
     // only redirect if the request comes from CryptPad's sandbox
     const safeOrigin = new URL(ApiConfig.httpSafeOrigin).origin;
     if (!document.referrer) {
-        window.alert('This link only works when loaded from a CryptPad document');
+        window.alert('This link only works when loaded from a PFT Docs document');
         return void reject();
     }
     try {
@@ -38,7 +38,7 @@ define(['/api/config'], function (ApiConfig) {
     // where stricter CSP blocks various attacks. Reject any other usage.
     if (safeOrigin !== window.location.origin) {
         window.alert('The bounce application must only be used from the sandbox domain, ' +
-            'please report this issue on https://github.com/cryptpad/cryptpad');
+            'please report this issue on https://github.com/agtico/pftdocs');
         return void reject();
     }
     // Old/bad browsers lack the URL API, making it more difficult to validate and compare URLs.

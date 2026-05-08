@@ -10,9 +10,35 @@
    but you should not change it directly (/common/translations/messages.{LANG}.js)
 */
 define(['/common/translations/messages.js'], function (Messages) {
-    // Replace the existing keys in your copied file here:
-    // Messages.button_newpad = "New Rich Text Document";
+    var rebrandText = function (value) {
+        if (typeof(value) !== 'string') { return value; }
+        return value
+            .replace(/\bCryptDrives\b/g, 'Drives')
+            .replace(/\bCryptDrive\b/g, 'Drive')
+            .replace(/\bCryptPad\b/g, 'PFT Docs')
+            .replace(/\bcryptpad\.org\b/g, 'postfiat.org')
+            .replace(/I love PFT Docs/g, 'I understand');
+    };
+
+    var rebrandObject = function (obj) {
+        if (!obj || typeof(obj) !== 'object') { return; }
+        Object.keys(obj).forEach(function (key) {
+            if (typeof(obj[key]) === 'string') {
+                obj[key] = rebrandText(obj[key]);
+                return;
+            }
+            rebrandObject(obj[key]);
+        });
+    };
+
+    rebrandObject(Messages);
+
+    Messages.main_title = 'PFT Docs';
+    if (Messages.type) { Messages.type.drive = 'Drive'; }
+    Messages.header_logoTitle = 'Go to your Drive';
+    Messages.header_homeTitle = 'Go to PFT Docs';
+    Messages.label_logo = 'PFT Docs logo';
+    Messages.og_default = 'PFT Docs: end-to-end encrypted collaboration';
 
     return Messages;
 });
-

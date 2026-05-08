@@ -3,18 +3,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 (function () {
-var logoPath = '/customize/CryptPad_logo_grey.svg';
-
 var elem = document.createElement('div');
 elem.setAttribute('id', 'placeholder');
 elem.innerHTML = `
 <div></div>
 <div class="placeholder-message-container">
-    <p>Loading...</p>
+    <p>Loading PFT Docs...</p>
 </div>
 <div id="placeholder-loading-footer">
     <div class="placeholder-logo-container">
-        <img class="placeholder-logo" alt="" aria-hidden="true" src="${logoPath}"><span>CryptPad</span>
+        <span class="placeholder-mark" aria-hidden="true">PF</span><span>PFT Docs</span>
     </div>
     <div id="placeholder-loading-status">
         <i data-lucide="lock" aria-hidden="true"></i>

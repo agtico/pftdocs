@@ -1,4 +1,4 @@
-# Post Fiat Docs UX Spec
+# PFT Docs UX Spec
 
 ## Product Direction
 
@@ -27,7 +27,7 @@ Use a new Post Fiat shell as the default logged-in experience.
 
 Top bar:
 
-- app name: `Post Fiat Docs`
+- app name: `PFT Docs`
 - global search
 - `New` button
 - wallet badge: address, lock state, copy address
@@ -39,6 +39,9 @@ Left rail:
 - `Docs`
 - `Shared with me`
 - `Sent`
+- `Task Node`
+- `Chat`
+- `AI`
 - `Contacts`
 - `Durable`
 - `Settings`
@@ -54,6 +57,9 @@ Recommended product routes:
 /app/docs/            owned/recent documents
 /app/shared/          encrypted Nostr inbox
 /app/sent/            sent private shares
+/app/tasknode/        wallet-derived Task Node history
+/app/chat/            AI chat with selected docs/tasks/context
+/app/ai/              local AI provider keys and status checks
 /app/contacts/        wallet contacts
 /app/durable/         explicit PFTL/IPFS publications
 /app/settings/        wallet, relays, instance config
@@ -346,6 +352,18 @@ Relays:
 - private relay proxy status
 - test relay connectivity
 
+AI provider keys:
+
+- selected provider: Ambient or OpenRouter
+- Ambient API key
+- OpenRouter API key
+- OpenRouter model selector
+- OpenRouter ZDR-only request defaults: `provider.zdr=true` and `provider.data_collection="deny"`
+- live OpenRouter ZDR endpoint/model status when available
+- browser-local storage status
+- provider key check status
+- explicit notice that provider API keys are not CryptPad document content, are not protected by document E2E encryption, and are sent directly to the selected provider when checked or used
+
 Privacy:
 
 - explain Nostr metadata limits
@@ -416,6 +434,7 @@ The UI should not be dominated by one hue family. Wallet/network states should u
 - [ ] Open live CryptPad pads inside a Post Fiat editor shell.
 - [ ] Move account/share controls out of CryptPad editor modals where feasible.
 - [ ] Add right-side panels for Share, Chat, Info, and History.
+- [ ] Remove the stock pad Users drawer/toggle from the default document workspace.
 - [ ] Keep raw CryptPad controls in an advanced escape hatch only.
 
 ### UX Phase D: Share Flow
@@ -450,7 +469,15 @@ The UI should not be dominated by one hue family. Wallet/network states should u
 - [ ] Add manifest/CID/signature inspector for early builds.
 - [ ] Keep durable publishing out of normal share flow.
 
-### UX Phase H: QA
+### UX Phase H: AI Chat
+
+- [ ] Build `/app/chat/` as a document-centered chat surface with recent chats in a light left rail.
+- [ ] Add source controls for latest Context Doc, Task Node tasks, and named document references.
+- [ ] Reuse `/app/#ai` provider settings for Ambient/OpenRouter and OpenRouter ZDR-only model selection.
+- [ ] Make provider/API-key privacy explicit: selected source text is sent to the chosen AI provider and is not CryptPad document E2E state.
+- [ ] Keep the composer fixed at the bottom with attachment/source, mode, voice placeholder, and send controls.
+
+### UX Phase I: QA
 
 - [ ] Add screenshot regression checks for desktop workspace, editor, share, inbox, contacts, and mobile.
 - [ ] Add e2e coverage for wallet login -> app shell -> create doc -> share -> recipient inbox -> open doc.

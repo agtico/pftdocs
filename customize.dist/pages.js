@@ -53,7 +53,7 @@ define([
     };
 
     Pages.accounts = {
-        donateURL: AppConfig.donateURL || "https://opencollective.com/cryptpad/",
+        donateURL: AppConfig.donateURL || '',
     };
 
     var languageSelector = function () {
@@ -100,7 +100,7 @@ define([
     var customURLs = Pages.customURLs = {};
     (function () {
         var defaultURLs = {
-            source: 'https://github.com/cryptpad/cryptpad',
+            source: 'https://github.com/agtico/pftdocs',
         };
         var l = Msg._getLanguage();
         ['imprint', 'privacy', 'terms', 'status', 'roadmap', 'source'].forEach(function (k) {
@@ -132,7 +132,7 @@ define([
         try {
             name = Pages.Instance.name || new URL('/', ApiConfig.httpUnsafeOrigin).host;
         } catch (err) {
-            name = 'CryptPad';
+            name = 'PFT Docs';
         }
         Pages.Instance.name = name;
         Pages.Instance.description = Pages.Instance.description || Msg.main_catch_phrase;
@@ -143,33 +143,28 @@ define([
     Pages.privacyLink = footLink(customURLs.privacy, 'privacy');
     Pages.termsLink = footLink(customURLs.terms, 'terms');
     Pages.sourceLink = footLink(customURLs.source, 'footer_source');
-    Pages.docsLink = footLink('https://docs.cryptpad.org', 'docs_link');
+    Pages.docsLink = footLink('/app/#docs', 'docs_link');
     Pages.roadmapLink = footLink(customURLs.roadmap, 'footer_roadmap');
 
 
     Pages.infopageFooter = function () {
         var donateButton;
         if (!ApiConfig.removeDonateButton) {
-            donateButton = footLink('https://opencollective.com/cryptpad/contribute/', 'footer_donate', null, 'donate'); // TODO migrate to forkawesome and use the OpenCollective icon
+            donateButton = '';
         }
 
         return h('footer.cp-footer', [
             h('div.cp-footer-left', [
-                h('a', {href:"https://cryptpad.org", role: 'button'}, [
+                h('a', {href:"/", role: 'button'}, [
                     h('div.cp-logo-foot', [
-                        h('img', {
-                            src: '/customize/CryptPad_logo.svg',
-                            "aria-hidden": true,
-                            alt: ''
-                        }),
-                        h('span.logo-font', 'CryptPad')
+                        h('span.logo-font', 'PFT Docs')
                     ])
                 ]),
                 h('span.cp-footer-version', 'v' + Pages.versionString)
             ]),
             h('div.cp-footer-center', [
                 h('div.cp-logo-btns', [
-                    footLink('https://cryptpad.org', null, Msg.footer_website, 'link'),
+                    footLink('/', null, Msg.footer_website, 'link'),
                     donateButton,
                 ])
             ]),
@@ -213,11 +208,6 @@ define([
         var isHome = ['/', '/index.html'].includes(window.location.pathname);
         var homeLink = h('a.nav-item.nav-link.cp-back-home' /* .navbar-brand */, { href: '/index.html', role: 'button'}, [
             Icons.get('chevron-left'),
-            h('img', {
-                src: '/customize/CryptPad_logo.svg',
-                "aria-hidden": true,
-                alt: ''
-            }),
             Msg.homePage
         ]);
 
@@ -235,7 +225,7 @@ define([
                     Icons.get('properties'),
                     pricingName
                 ]),
-                h('a.nav-item.nav-link', { href: 'https://docs.cryptpad.org'}, [
+                h('a.nav-item.nav-link', { href: '/app/#docs'}, [
                     Icons.get('documentation'),
                     Msg.docs_link]),
             ].concat(rightLinks)

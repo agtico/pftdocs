@@ -5,7 +5,7 @@
 Local path:
 
 ```text
-/home/pfrpc/repos/cryptpad-pft
+/home/pfrpc/repos/pftdocs
 ```
 
 Upstream base:
@@ -37,11 +37,16 @@ Implemented so far:
 - `src/postfiat/private-share-workflow.mjs`: public Nostr wallet-directory publish/fetch for resolving a PFT wallet address to its private-share inbox key and relay set.
 - `www/common/postfiat-private-share.bundle.js`: browser IIFE bundle exposing the private-share workflow as `window.PostFiatPrivateShare`.
 - `www/common/postfiat-private-share-contacts.js`: encrypted-account saved recipients for private-share contacts.
+- `src/postfiat/wallet-core.mjs`: Task Node `pf.ptr/v4` account history loading plus an indexed `pftasks` snapshot loader that normalizes context revisions, task events, and submissions, then hydrates/decrypts IPFS CIDs with the unlocked wallet mnemonic.
+- `www/common/sframe-common-outer.js`: `Q_POSTFIAT_TASKNODE` can use the indexed snapshot loader when callers provide `indexedData`/`snapshot`; otherwise it keeps the PFTL `account_tx` path.
+- `www/app/inner.js`: Post Fiat shell includes an `AI` page for browser-local Ambient and OpenRouter API keys with direct provider status checks, provider selection, and an OpenRouter model selector. OpenRouter is configured for ZDR-only request defaults with `provider.zdr=true` and `provider.data_collection="deny"`, and the selector uses OpenRouter's live ZDR endpoint list when available. These keys/settings are not CryptPad document content and are not covered by document E2E encryption.
+- `www/app/inner.js`: Post Fiat shell includes a `/app/#chat` route with a ChatGPT-style two-pane chat layout. The source popup can include the latest decrypted Task Node Context Doc, readable Task Node task history, and selected CryptPad documents by name, then sends that browser-assembled context directly to the configured AI provider.
+- `www/pad/app-pad.less`: stock pad Users drawer/toggle is hidden in the default document workspace to keep the editor/chat surface focused.
 - `www/common/inner/share.js`: Post Fiat is now the primary share tab when `postFiat` config is present; it copies the current wallet inbox JSON and publishes live-pad gift wraps to relay(s).
 - `www/common/drive-ui.js`: Drive now has a first-pass "Shared with me" Post Fiat inbox button that fetches/decrypts relay gift wraps and lets users open or save received pad links.
 - `scripts/postfiat-onion-dev.sh`: repeatable user-local Tor onion runner for main/sandbox origins. `npm run dev:onion` starts Tor, writes gitignored `config/config.js`, and runs CryptPad on localhost.
 - `scripts/tests/postfiat-*.test.*`: focused unit tests for wallet derivation, signing, entropy derivation, PFT channel bytes, wallet session storage, key registry parsing, Nostr identity/directory records, NIP-44/NIP-59 wrapping, relay publish/fetch helpers, full private-share workflow, and live-pad share payloads.
-- `docs/postfiat/UX_SPEC.md`: target Post Fiat Docs product UX, including the `/app/` shell, document workspace, editor shell, share-to-wallet flow, inbox, contacts, durable publishing, mobile layout, and UX implementation burndown.
+- `docs/postfiat/UX_SPEC.md`: target PFT Docs product UX, including the `/app/` shell, document workspace, editor shell, share-to-wallet flow, inbox, contacts, durable publishing, mobile layout, and UX implementation burndown.
 
 Architecture pivot to preserve privacy:
 
@@ -85,6 +90,7 @@ Use these local repos as references:
 - Canonical private share model is encrypted Nostr relay delivery of live-pad capability payloads.
 - Durable/publication share model is PFTL v3 ContentBlob/AccessManifest plus XRPL pointer memo, used only when the user explicitly chooses durable publication/export.
 - Raw CryptPad URL sharing should be legacy/advanced, not the main PFT UX.
+- Task Node read-only history can be loaded from PFTL `account_tx` pointers when the RPC has history, or from indexed `pftasks` rows when the app already has context/task/submission data. Both paths must reuse the same wallet-derived X25519 decrypt flow.
 - Onion service deployment is the canonical privacy-preserving public access path. Cloudflare Tunnel is a temporary debugging fallback only.
 - IPFS/PFTL should not be the silent default because CIDs, pinning providers, gateways, timing, and retention can create a document activity trail even if payments are shielded.
 - Revocation requires file-key/content rotation.
@@ -102,6 +108,7 @@ Use these local repos as references:
 - `tasknode-wallet` uses XRPL family seeds today; use `pftasks/app/src/lib/wallet` for the current 24-word mnemonic implementation.
 - `pftasks` encrypted-wallet localStorage backup should be security-reviewed before copying.
 - Stock CryptPad treats `Block_hash` as the login capability. Do not persist wallet-derived `Block_hash` outside the current session.
+- The current configured testnet RPC can return zero `account_tx` rows for an active high-history wallet; do not assume ledger history is available. Prefer the indexed snapshot bridge for local `pftasks`/CryptPad integration until the RPC history path is proven.
 
 ## Smoke Test Targets For The First Implementation PR
 
@@ -114,5 +121,6 @@ Use these local repos as references:
 - Open a new same-origin `/drive/` tab while the first wallet tab is still unlocked and confirm it does not silently unlock.
 - Share a live pad to a second wallet through encrypted Nostr relay delivery.
 - Recipient decrypts the private inbox payload and opens/imports the pad.
+- Load Task Node context/task history from indexed `pftasks` rows and decrypt the latest context CID through IPFS with the unlocked wallet.
 - Load `/login/` and at least one live pad through Tor SOCKS against the onion main/sandbox origins.
 - Durable PFTL/IPFS publication remains an explicit advanced flow with privacy warnings.

@@ -16,8 +16,10 @@ SOCKS_HOST="${POSTFIAT_ONION_SOCKS_HOST:-127.0.0.1}"
 SOCKS_PORT="${POSTFIAT_ONION_SOCKS_PORT:-19050}"
 MAX_WORKERS="${POSTFIAT_ONION_MAX_WORKERS:-2}"
 PFTL_RPC_URL="${POSTFIAT_PFTL_RPC_URL:-http://178.156.143.199:5005}"
-PFTL_WSS_URL="${POSTFIAT_PFTL_WSS_URL:-ws://178.156.143.199:6005}"
+PFTL_WSS_URL="${POSTFIAT_PFTL_WSS_URL:-wss://ws.testnet.postfiat.org}"
+PFTL_ARCHIVE_WSS_URL="${POSTFIAT_PFTL_ARCHIVE_WSS_URL:-wss://ws-archive.testnet.postfiat.org}"
 PFTL_IPFS_GATEWAY="${POSTFIAT_IPFS_GATEWAY:-https://dweb.link/ipfs/}"
+PFTL_PFT_CURRENCY="${POSTFIAT_PFT_CURRENCY:-PFT}"
 
 MAIN_DIR="$DATA_DIR/cryptpad-main"
 SAFE_DIR="$DATA_DIR/cryptpad-safe"
@@ -43,7 +45,9 @@ Environment overrides:
   POSTFIAT_ONION_COMPRESS        Set to 0 to skip static .gz/.br generation
   POSTFIAT_PFTL_RPC_URL          PFTL JSON-RPC URL for same-origin Task Node proxy
   POSTFIAT_PFTL_WSS_URL          PFTL websocket URL for future signing flows
+  POSTFIAT_PFTL_ARCHIVE_WSS_URL  PFTL archive websocket URL for account_tx history
   POSTFIAT_IPFS_GATEWAY          Preferred IPFS gateway for same-origin Task Node proxy
+  POSTFIAT_PFT_CURRENCY          Native currency display code for peer payments, default PFT
 EOF
 }
 
@@ -169,18 +173,15 @@ safe_host() {
 }
 
 write_config() {
-    local main_origin safe_origin config_path backup_path
+    local main_origin safe_origin config_path backup_path tmp_path
     main_origin="http://$(main_host)"
     safe_origin="http://$(safe_host)"
     config_path="$ROOT/config/config.js"
+    tmp_path="$(mktemp "$STATE_DIR/config.js.XXXXXX")"
 
     mkdir -p "$ROOT/config"
-    if [ -f "$config_path" ]; then
-        backup_path="$config_path.onion-backup-$(date +%Y%m%d%H%M%S)"
-        cp "$config_path" "$backup_path"
-    fi
 
-    cat > "$config_path" <<EOF
+    cat > "$tmp_path" <<EOF
 // Local onion development config. This file is gitignored.
 const config = require('./config.example');
 
@@ -195,12 +196,14 @@ config.logToStdout = true;
 config.logIP = false;
 config.postFiat = config.postFiat || {};
 config.postFiat.walletFirst = true;
-config.postFiat.disableLegacyLogin = false;
+config.postFiat.disableLegacyLogin = true;
 config.postFiat.pftl = config.postFiat.pftl || {};
 config.postFiat.pftl.networkId = 2025;
 config.postFiat.pftl.rpcUrl = '$PFTL_RPC_URL';
 config.postFiat.pftl.wssUrl = '$PFTL_WSS_URL';
+config.postFiat.pftl.archiveWssUrl = '$PFTL_ARCHIVE_WSS_URL';
 config.postFiat.pftl.ipfsGateway = '$PFTL_IPFS_GATEWAY';
+config.postFiat.pftl.pftCurrency = '$PFTL_PFT_CURRENCY';
 config.postFiat.nostr = config.postFiat.nostr || {};
 config.postFiat.nostr.privateRelays = [
     'wss://relay.primal.net',
@@ -209,6 +212,17 @@ config.postFiat.nostr.privateRelays = [
 
 module.exports = config;
 EOF
+
+    if [ -f "$config_path" ] && cmp -s "$tmp_path" "$config_path"; then
+        rm -f "$tmp_path"
+        return
+    fi
+
+    if [ -f "$config_path" ]; then
+        backup_path="$STATE_DIR/config.js.onion-backup-$(date +%Y%m%d%H%M%S)"
+        cp "$config_path" "$backup_path"
+    fi
+    mv "$tmp_path" "$config_path"
 }
 
 print_status() {

@@ -76,13 +76,13 @@ define([
                 url: '/common/feedback.html?NO_LOCALSTORAGE=' + (+new Date()),
             });
         });
-        window.alert("CryptPad needs localStorage to work. Try changing your cookie permissions, or using a different browser");
+        window.alert("PFT Docs needs localStorage to work. Try changing your cookie permissions, or using a different browser");
     };
 
     window.onerror = function (e) {
         if (/requirejs\.org/.test(e)) {
             console.log();
-            console.error("Require.js threw a Script Error. This probably means you're missing a dependency for CryptPad.\nIt is recommended that the admin of this server runs `npm install && npm run install:components` to get the latest code.\nBest of luck,\nThe CryptPad Developers");
+            console.error("Require.js threw a Script Error. This probably means you're missing a dependency for PFT Docs.\nIt is recommended that the admin of this server runs `npm install && npm run install:components` to get the latest code.");
             return void console.log();
         }
         if (window.CryptPad_loadingError) {
@@ -102,7 +102,7 @@ define([
 
     if (typeof(Promise) !== 'function') {
         return void setTimeout(function () {
-            var s = "Internet Explorer is not supported anymore, including by Microsoft.\n\nMost of CryptPad's collaborative functionality requires a modern browser to work.\n\nWe recommend Mozilla Firefox.";
+            var s = "Internet Explorer is not supported anymore, including by Microsoft.\n\nMost of PFT Docs' collaborative functionality requires a modern browser to work.\n\nWe recommend Mozilla Firefox.";
             window.alert(s);
         });
     }

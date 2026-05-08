@@ -256,7 +256,7 @@ Note: This must currently be reversed manually (by deleting the mfa config file)
     $hostname.val(new URL(window.location.href).hostname);
 
     var $label = $('#totp-label');
-    $label.val('CryptPad');
+    $label.val('PFT Docs');
 
     var $uri = $('#totp-uri');
 

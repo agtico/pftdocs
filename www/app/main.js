@@ -7,6 +7,32 @@ define([
     '/common/dom-ready.js',
     '/common/sframe-common-outer.js',
 ], function (nThen, DomReady, SFCommonO) {
+    var postFiatRoutes = {
+        docs: true,
+        shared: true,
+        sent: true,
+        tasknode: true,
+        messages: true,
+        chat: true,
+        ai: true,
+        compute: true,
+        contacts: true,
+        durable: true,
+        settings: true
+    };
+
+    var normalizePostFiatRouteUrl = function () {
+        var hashRoute = String(window.location.hash || '').replace(/^#/, '');
+        var search;
+        if (!postFiatRoutes[hashRoute]) { return; }
+        search = '?pftRoute=' + encodeURIComponent(hashRoute);
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, window.document.title, window.location.pathname + search);
+        }
+    };
+
+    normalizePostFiatRouteUrl();
+
     nThen(function (waitFor) {
         DomReady.onReady(waitFor());
     }).nThen(function (waitFor) {
@@ -58,6 +84,7 @@ define([
         SFCommonO.start({
             requires: 'drive',
             cache: true,
+            href: window.location.origin + window.location.pathname,
             noHash: true,
             noRealtime: true,
             driveEvents: true,

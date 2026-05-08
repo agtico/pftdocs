@@ -53,7 +53,7 @@ define([
     // Upgrade and donate URLs duplicated in pages.js
     var common = window.Cryptpad = {
         Messages: Messages,
-        donateURL: AppConfig.donateURL || "https://opencollective.com/cryptpad/",
+        donateURL: AppConfig.donateURL || '',
         account: {},
     };
 
@@ -377,7 +377,7 @@ define([
                     key: ['teams', id, 'keys', 'roster', 'lastKnownHash'],
                     value: ''
                 }, function () {
-                    console.log('done, please close all your CryptPad tabs before testing the fix');
+                    console.log('done, please close all your PFT Docs tabs before testing the fix');
                 });
             });
         });

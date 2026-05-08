@@ -9,7 +9,7 @@ This document captures the local repository research that led to the architectur
 Fresh upstream fork source:
 
 - Local source checked: `/home/pfrpc/repos/cryptpad`
-- Fresh fork clone: `/home/pfrpc/repos/cryptpad-pft`
+- Fresh fork clone: `/home/pfrpc/repos/pftdocs`
 - Upstream remote: `https://github.com/cryptpad/cryptpad.git`
 - Upstream head used: `9004ad2dd1b40d571b25f66dfe968606233f51a8`
 

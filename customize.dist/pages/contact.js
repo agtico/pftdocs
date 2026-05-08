@@ -12,40 +12,14 @@ define([
 
     return function () {
         document.title = Msg.contact;
-        var developerEmail = "contact@cryptpad.org";
+        var developerEmail = "support@postfiat.org";
         var adminEmail = Config.adminEmail && [
-            'i.did.not.read.my.config@cryptpad.fr',
+            'i.did.not.read.my.config@postfiat.org',
             developerEmail
         ].indexOf(Config.adminEmail) === -1;
         var adminMailbox = Config.supportMailbox && LocalStore.isLoggedIn();
 
-        let contacts = [
-            {
-                name: Msg.contact_chat || "Chat",
-                image: "/customize/images/sayhi.svg",
-                href: "https://matrix.to/#/#cryptpad:matrix.xwiki.com",
-            },
-            {
-                name: Msg.contact_mastodon || "Mastodon",
-                image: "/customize/images/mastodon.svg",
-                href: "https://social.xwiki.com/@CryptPad",
-            },
-            {
-                name: Msg.contact_bug || "Bug report",
-                image: "/customize/images/github.svg",
-                href: "https://github.com/cryptpad/cryptpad/issues/",
-            },
-            {
-                name: Msg.contact_forum || "Forum",
-                image: "/customize/images/forum.svg",
-                href: "https://forum.cryptpad.org/",
-            },
-            {
-                name: Msg.contact_email || "Email",
-                image: "/customize/images/email.svg",
-                href: 'mailto:' + developerEmail,
-            },
-        ];
+        let contacts = [];
 
         return h('div#cp-main', [
             Pages.infopageTopbar(),
@@ -87,7 +61,7 @@ define([
                         )
                     ) : undefined,
                 ]) : undefined,
-                h('div.row.cp-iconCont.align-items-center', [
+                contacts.length ? h('div.row.cp-iconCont.align-items-center', [
                     h('div.col-12',
                         Pages.setHTML(h('h2.text-center'), Msg.contact_dev),
                         h('p.center', Msg.contact_devHint)
@@ -107,10 +81,9 @@ define([
                             )
                         )
                     )
-                ))),
+                ))) : undefined,
             ]),
             Pages.infopageFooter(),
         ]);
     };
 });
-

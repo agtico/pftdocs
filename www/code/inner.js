@@ -189,9 +189,9 @@ define([
         var $codeMirrorContainer = $('#cp-app-code-container');
         var $codeMirror = $('.CodeMirror');
 
-        $('<img>', {
-            src: '/customize/CryptPad_logo_grey.svg',
-            alt: '',
+        $('<div>', {
+            text: 'PF',
+            'aria-hidden': true,
             class: 'cp-app-code-preview-empty'
         }).appendTo($previewContainer);
 

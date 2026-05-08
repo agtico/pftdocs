@@ -4,12 +4,12 @@
 
 ---
 services:
-  cryptpad-pft:
+  pftdocs:
     build:
       context: ../..
       dockerfile: Dockerfile
-    image: agtico/cryptpad-pft:local
-    hostname: cryptpad-pft
+    image: agtico/pftdocs:local
+    hostname: pftdocs
     restart: unless-stopped
 
     environment:

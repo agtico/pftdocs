@@ -1128,12 +1128,12 @@ define([
             let labelCurrent = blocks.labelledInput(Messages.admin_colorCurrent, current);
             let preview = blocks.block([
                 blocks.block([
-                    blocks.link('CryptPad', '/admin/#customize'),
+                    blocks.link('PFT Docs', '/admin/#customize'),
                     blocks.button('primary', 'save', Messages.settings_save),
                     blocks.button('secondary', 'save', Messages.settings_save)
                 ], 'cp-admin-color-preview-dark cp-sidebar-flex-block'),
                 blocks.block([
-                    blocks.link('CryptPad', '/admin/#customize'),
+                    blocks.link('PFT Docs', '/admin/#customize'),
                     blocks.button('primary', 'save', Messages.settings_save),
                     blocks.button('secondary', 'save', Messages.settings_save)
                 ], 'cp-admin-color-preview-light cp-sidebar-flex-block')
@@ -3973,7 +3973,7 @@ define([
         sidebar.addItem('update-available', function(cb){
             if (!APP.instanceStatus.updateAvailable) { return; }
 
-            var updateURL = 'https://github.com/cryptpad/cryptpad/releases/latest';
+            var updateURL = 'https://github.com/agtico/pftdocs/releases/latest';
             if (typeof(APP.instanceStatus.updateAvailable) === 'string') {
                 updateURL = APP.instanceStatus.updateAvailable;
             }

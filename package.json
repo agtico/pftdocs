@@ -1,15 +1,11 @@
 {
-  "name": "cryptpad",
-  "description": "a collaborative office suite that is end-to-end encrypted and open-source",
+  "name": "pftdocs",
+  "description": "PFT Docs, a wallet-aware encrypted document workspace for Post Fiat",
   "version": "2026.2.2",
   "license": "AGPL-3.0+",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cryptpad/cryptpad.git"
-  },
-  "funding": {
-    "type": "opencollective",
-    "url": "https://opencollective.com/cryptpad"
+    "url": "git+https://github.com/agtico/pftdocs.git"
   },
   "dependencies": {
     "@mcrowe/minibloom": "^0.2.0",

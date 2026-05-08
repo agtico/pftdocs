@@ -17,7 +17,9 @@ import {
 } from './nostr-identity.mjs';
 import {
     buildPrivateShareGiftWrap,
+    buildNostrPrivateDirectMessageGiftWrap,
     signNostrEvent,
+    unwrapNostrPrivateDirectMessageGiftWrap,
     unwrapPrivateShareGiftWrap,
     verifyNostrEvent,
 } from './nostr-private-share.mjs';
@@ -31,6 +33,11 @@ export const NOSTR_KIND_POSTFIAT_DIRECTORY = 30078;
 export const POSTFIAT_NOSTR_DIRECTORY_D_TAG_PREFIX = 'postfiat:cryptpad:nostr-inbox:v1';
 export const POSTFIAT_NOSTR_DIRECTORY_TAG = 'cryptpad-nostr-inbox';
 export const POSTFIAT_NOSTR_DIRECTORY_TAG_VERSION = '1';
+export const POSTFIAT_NOSTR_CHAT_TAG = 'pft-chat';
+export const POSTFIAT_NOSTR_CHAT_TAG_VERSION = '1';
+export const POSTFIAT_NOSTR_CHAT_CONTENT_TYPE =
+    'application/vnd.postfiat.nostr-chat+json;version=1';
+export const POSTFIAT_NOSTR_CHAT_PAYLOAD_KIND = 'postfiat-peer-chat-message';
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -66,7 +73,14 @@ export const normalizePrivateShareRecipient = (record) => {
         return parseNostrInboxDirectoryRecord(parsed);
     }
     if (parsed?.walletAddress && (parsed.publicKeyHex || parsed.pubkey)) {
-        return parseNostrInboxDirectoryRecord(parsed);
+        if (!isWalletAddress(parsed.walletAddress)) {
+            throw new Error('INVALID_WALLET_ADDRESS');
+        }
+        return {
+            walletAddress: parsed.walletAddress,
+            publicKeyHex: normalizeNostrPublicKeyHex(parsed.publicKeyHex || parsed.pubkey),
+            relays: normalizeNostrRelayList(parsed.relays || []),
+        };
     }
     if (parsed?.walletAddress && isWalletAddress(parsed.walletAddress)) {
         return { walletAddress: parsed.walletAddress };
@@ -250,6 +264,134 @@ export const selectPrivateShareRelays = ({
     return normalizeNostrRelayList(configured?.length ? configured : fallbackRelays);
 };
 
+const normalizeChatText = (text) => {
+    const normalized = String(text || '').replace(/\r\n/g, '\n').trim();
+    if (!normalized) {
+        throw new Error('MISSING_POSTFIAT_CHAT_TEXT');
+    }
+    if (normalized.length > 8000) {
+        throw new Error('POSTFIAT_CHAT_TEXT_TOO_LONG');
+    }
+    return normalized;
+};
+
+export const buildPeerChatMessagePayload = ({
+    text,
+    fromWallet,
+    toWallet,
+    createdAt,
+    payment,
+} = {}) => {
+    const payload = {
+        version: 1,
+        kind: POSTFIAT_NOSTR_CHAT_PAYLOAD_KIND,
+        text: normalizeChatText(text),
+        fromWallet: fromWallet || null,
+        toWallet: toWallet || null,
+        createdAt: createdAt || new Date().toISOString(),
+    };
+    if (payment && typeof payment === 'object') {
+        payload.payment = {
+            currency: String(payment.currency || 'PFT'),
+            amount: String(payment.amount || ''),
+            txHash: payment.txHash ? String(payment.txHash) : null,
+            destination: payment.destination ? String(payment.destination) : null,
+        };
+    }
+    return payload;
+};
+
+const hasPeerChatTag = (rumor) => (rumor?.tags || []).some((tag) =>
+    tag[0] === 'postfiat' &&
+    tag[1] === POSTFIAT_NOSTR_CHAT_TAG &&
+    tag[2] === POSTFIAT_NOSTR_CHAT_TAG_VERSION
+);
+
+const parsePeerChatPayload = (rumor) => {
+    if (!hasPeerChatTag(rumor)) {
+        throw new Error('NOT_POSTFIAT_CHAT_MESSAGE');
+    }
+    const payload = JSON.parse(String(rumor.content || '{}'));
+    if (!payload || payload.kind !== POSTFIAT_NOSTR_CHAT_PAYLOAD_KIND ||
+            payload.version !== 1) {
+        throw new Error('INVALID_POSTFIAT_CHAT_PAYLOAD');
+    }
+    return buildPeerChatMessagePayload(payload);
+};
+
+export const buildPeerChatMessage = async ({
+    senderMnemonic,
+    recipientDirectory,
+    postFiatConfig,
+    fallbackRelays,
+    origin,
+    text,
+    payment,
+    createdAt,
+    currentTime,
+    rumorCreatedAt,
+    sealCreatedAt,
+    wrapCreatedAt,
+    sealNonce,
+    wrapNonce,
+    wrapperPrivateKeyHex,
+    directoryRelays,
+    directoryLimit,
+    WebSocketImpl,
+    timeoutMs,
+} = {}) => {
+    const senderIdentity = await deriveNostrIdentityFromMnemonic(senderMnemonic, { origin });
+    const directory = await resolvePrivateShareRecipient(recipientDirectory, {
+        relayUrls: directoryRelays,
+        postFiatConfig,
+        fallbackRelays,
+        WebSocketImpl,
+        timeoutMs,
+        directoryLimit,
+    });
+    const relays = selectPrivateShareRelays({
+        recipientDirectory: directory,
+        postFiatConfig,
+        fallbackRelays,
+    });
+    const payload = buildPeerChatMessagePayload({
+        text,
+        fromWallet: senderIdentity.walletAddress,
+        toWallet: directory.walletAddress || null,
+        payment,
+        createdAt,
+    });
+    const wrapped = buildNostrPrivateDirectMessageGiftWrap({
+        senderPrivateKeyHex: senderIdentity.privateKeyHex,
+        recipientPublicKeyHex: directory.publicKeyHex,
+        recipientRelay: relays[0],
+        tags: [
+            ['postfiat', POSTFIAT_NOSTR_CHAT_TAG, POSTFIAT_NOSTR_CHAT_TAG_VERSION],
+            ['content-type', POSTFIAT_NOSTR_CHAT_CONTENT_TYPE],
+            ['wallet', senderIdentity.walletAddress],
+        ],
+        content: JSON.stringify(payload),
+        currentTime,
+        rumorCreatedAt,
+        sealCreatedAt,
+        wrapCreatedAt,
+        sealNonce,
+        wrapNonce,
+        wrapperPrivateKeyHex,
+    });
+
+    return {
+        sender: {
+            walletAddress: senderIdentity.walletAddress,
+            publicKeyHex: senderIdentity.publicKeyHex,
+        },
+        recipient: directory,
+        payload,
+        ...wrapped,
+        relays,
+    };
+};
+
 export const buildLivePadPrivateShare = async ({
     senderMnemonic,
     recipientDirectory,
@@ -367,6 +509,20 @@ export const publishLivePadPrivateShare = async (options = {}) => {
     };
 };
 
+export const publishPeerChatMessage = async (options = {}) => {
+    const built = await buildPeerChatMessage(options);
+    const publishResults = await publishNostrEventToRelays({
+        relayUrls: built.relays,
+        event: built.giftWrap,
+        WebSocketImpl: options.WebSocketImpl,
+        timeoutMs: options.timeoutMs,
+    });
+    return {
+        ...built,
+        publishResults,
+    };
+};
+
 export const openLivePadPrivateShare = async ({
     recipientMnemonic,
     giftWrap,
@@ -384,6 +540,26 @@ export const openLivePadPrivateShare = async ({
         },
         ...opened,
         payload: opened.envelope.payload,
+    };
+};
+
+export const openPeerChatMessage = async ({
+    recipientMnemonic,
+    giftWrap,
+    origin,
+} = {}) => {
+    const recipientIdentity = await deriveNostrIdentityFromMnemonic(recipientMnemonic, { origin });
+    const opened = unwrapNostrPrivateDirectMessageGiftWrap({
+        giftWrap,
+        recipientPrivateKeyHex: recipientIdentity.privateKeyHex,
+    });
+    return {
+        recipient: {
+            walletAddress: recipientIdentity.walletAddress,
+            publicKeyHex: recipientIdentity.publicKeyHex,
+        },
+        ...opened,
+        payload: parsePeerChatPayload(opened.rumor),
     };
 };
 
@@ -428,6 +604,9 @@ export const fetchAndOpenLivePadPrivateShares = async ({
                 payload: opened.envelope.payload,
             });
         } catch (err) {
+            if (err?.message === 'NOT_PRIVATE_SHARE_MESSAGE') {
+                return;
+            }
             failures.push({
                 eventId: giftWrap?.id,
                 error: err.message || String(err),
@@ -442,6 +621,74 @@ export const fetchAndOpenLivePadPrivateShares = async ({
         relays,
         inbox,
         shares,
+        failures,
+    };
+};
+
+export const fetchAndOpenPeerChatMessages = async ({
+    recipientMnemonic,
+    relayUrls,
+    postFiatConfig,
+    fallbackRelays,
+    origin,
+    WebSocketImpl,
+    since,
+    until,
+    limit,
+    timeoutMs,
+} = {}) => {
+    const recipientIdentity = await deriveNostrIdentityFromMnemonic(recipientMnemonic, { origin });
+    const relays = normalizeNostrRelayList(
+        relayUrls?.length ? relayUrls :
+            postFiatConfig?.nostr?.privateRelays?.length ? postFiatConfig.nostr.privateRelays :
+                postFiatConfig?.nostr?.relays?.length ? postFiatConfig.nostr.relays :
+                    fallbackRelays
+    );
+    const inbox = await fetchGiftWrapsFromRelays({
+        relayUrls: relays,
+        recipientPublicKeyHex: recipientIdentity.publicKeyHex,
+        WebSocketImpl,
+        since,
+        until,
+        limit,
+        timeoutMs,
+    });
+    const messages = [];
+    const failures = [];
+    inbox.events.forEach((giftWrap) => {
+        try {
+            const opened = unwrapNostrPrivateDirectMessageGiftWrap({
+                giftWrap,
+                recipientPrivateKeyHex: recipientIdentity.privateKeyHex,
+            });
+            messages.push({
+                ...opened,
+                payload: parsePeerChatPayload(opened.rumor),
+            });
+        } catch (err) {
+            if (err?.message === 'NOT_POSTFIAT_CHAT_MESSAGE' ||
+                    err?.message === 'NOT_PRIVATE_SHARE_MESSAGE') {
+                return;
+            }
+            failures.push({
+                eventId: giftWrap?.id,
+                error: err.message || String(err),
+            });
+        }
+    });
+    messages.sort((a, b) => {
+        const aTime = Date.parse(a.payload?.createdAt || '') || a.rumor?.created_at || 0;
+        const bTime = Date.parse(b.payload?.createdAt || '') || b.rumor?.created_at || 0;
+        return aTime - bTime;
+    });
+    return {
+        recipient: {
+            walletAddress: recipientIdentity.walletAddress,
+            publicKeyHex: recipientIdentity.publicKeyHex,
+        },
+        relays,
+        inbox,
+        messages,
         failures,
     };
 };

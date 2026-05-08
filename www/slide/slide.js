@@ -80,9 +80,9 @@ define([
         var c = Slide.content;
 
         if (c === '') {
-            var $empty = $('<img>', {
-                src: '/customize/CryptPad_logo_grey.svg',
-                alt: '',
+            var $empty = $('<div>', {
+                text: 'PF',
+                'aria-hidden': true,
                 class: 'cp-app-code-preview-empty'
             });
             $content.html('').append($empty);

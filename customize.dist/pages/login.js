@@ -61,7 +61,7 @@ define([
             h('div.container.cp-container', [
                 h('div.row.cp-page-title', h('h1', forceWalletVault ?
                     'Unlock Post Fiat wallet' : (switchWalletLogin ?
-                        'Switch Post Fiat wallet' : 'Post Fiat Docs'))),
+                        'Switch Post Fiat wallet' : 'PFT Docs'))),
                 h('div.row.cp-page-title.pft-login-subtitle', h('p', forceWalletVault ?
                     'Unlock the wallet signer used for sharing and inbox access.' :
                     (switchWalletLogin ?
@@ -72,7 +72,8 @@ define([
                     h('div#userForm.form-group.col-md-6'+ssoEnforced, [
                         h('div.cp-postfiat-wallet-login', [
                             h('div.cp-login-instance', forceWalletVault ?
-                                'Wallet unlock' : 'Post Fiat wallet'),
+                                'Wallet unlock' : (switchWalletLogin ?
+                                    'Switch wallet account' : 'Post Fiat wallet')),
                             h('div#pft-session-wallet.cp-hidden', [
                                 h('div#pft-session-wallet-status', 'Checking current wallet session...'),
                                 h('div.extra', [
@@ -189,10 +190,10 @@ define([
                         h('div.extra'+legacyToggleHidden, [
                             h('button#pft-show-legacy-login.btn.btn-secondary', {
                                 type: 'button',
-                            }, 'Legacy CryptPad login'),
+                            }, 'Advanced account login'),
                         ]),
                         h('div#pft-legacy-login.cp-legacy-login'+legacyHidden, [
-                            h('div.cp-login-instance', 'Legacy CryptPad login'),
+                            h('div.cp-login-instance', 'Advanced account login'),
                             h('div.big-container', [
                                 h('div.input-container', [
                                     h('label.cp-default-label', { for: 'name' }, Msg.login_username),

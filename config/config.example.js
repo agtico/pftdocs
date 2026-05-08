@@ -110,22 +110,35 @@ module.exports = {
 
 /*  Post Fiat wallet-native login is enabled by default in this fork.
  *  `walletFirst` keeps the Post Fiat wallet unlock/seed form as the primary login path.
- *  `disableLegacyLogin` hides the old CryptPad username/password login on /login/.
- *  Keep legacy login enabled while migrating old accounts.
+ *  `disableLegacyLogin` hides the old username/password login on /login/.
+ *  Keep it disabled for the Post Fiat-branded workspace.
  */
     postFiat: {
         walletFirst: true,
-        disableLegacyLogin: false,
+        disableLegacyLogin: true,
         pftl: {
             networkId: 2025,
             rpcUrl: '',
             wssUrl: '',
+            archiveWssUrl: '',
             ipfsGateway: '',
+            pftCurrency: 'PFT',
+            // Same-process cache for public on-chain account_tx pages.
+            // Set ttl/maxEntries to 0 to disable. Stale entries are only used
+            // when upstream PFTL history fetches fail.
+            accountTxCacheTtlMs: 60 * 1000,
+            accountTxCacheStaleMs: 10 * 60 * 1000,
+            accountTxCacheMaxEntries: 2048,
         },
         nostr: {
             relays: [],
             privateRelays: [],
             relayProxy: '',
+        },
+        ai: {
+            ambientBaseUrl: 'https://api.ambient.xyz',
+            openRouterBaseUrl: 'https://openrouter.ai',
+            runPodProxyOrigin: 'https://*.proxy.runpod.net',
         },
     },
 

@@ -1271,7 +1271,7 @@ define([
 
         $button.click(function () {
             UI.prompt(Messages.settings_resetPrompt, "", function (val) {
-                if (val !== "I love CryptPad") {
+                if (val !== "I understand") {
                     UI.alert(Messages.settings_resetError);
                     return;
                 }

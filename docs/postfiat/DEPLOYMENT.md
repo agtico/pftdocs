@@ -70,6 +70,7 @@ module.exports = {
             networkId: 2025,
             rpcUrl: '',
             wssUrl: '',
+            archiveWssUrl: '',
             ipfsGateway: '',
         },
         nostr: {
@@ -88,6 +89,16 @@ Nostr relays do not see document plaintext or CryptPad capability payloads, but 
 ## Durable PFTL/IPFS Notes
 
 PFTL/IPFS publication is not the default sharing mode. Durable publication can expose CIDs, gateway access patterns, pinning providers, timing, and long-lived pointer existence. Label it as export/publication and do not trigger it from normal share-to-wallet flows.
+
+## AI Provider Key Notes
+
+The `/app/#ai` page stores Ambient and OpenRouter API keys in the user's browser local storage and checks them directly against the provider APIs. It also stores the selected AI provider and selected model settings for OpenRouter and RunPod. These settings are not stored as CryptPad document content, are not synced as encrypted document state, and are not protected by CryptPad document E2E encryption. The configured Post Fiat CSP allows `https://api.ambient.xyz`, `https://openrouter.ai`, and `https://*.proxy.runpod.net` by default.
+
+RunPod SGLang endpoints do not consistently expose browser CORS headers, so RunPod chat calls are proxied through `/api/postfiat/runpod/openai/*`. That proxy only accepts `https://*.proxy.runpod.net` base URLs and forwards active model/chat requests; it does not store prompts or responses.
+
+OpenRouter requests from the Post Fiat AI settings should include `provider.zdr=true` and `provider.data_collection="deny"`. The model selector filters against OpenRouter's live `/api/v1/endpoints/zdr` data when that endpoint is reachable, but account-wide ZDR should still be enabled in OpenRouter privacy settings for defense in depth.
+
+The `/app/#chat` page uses the same browser-local provider keys. When a user enables Context Doc, Tasks, or named document references in the chat source popup, the decrypted selected text is assembled in the browser and sent directly to the chosen AI provider with the user's prompt. Chat transcripts and source selections are browser-local UI state; they are not CryptPad document E2E content and should be treated as local provider-facing data.
 
 ## Operational Checklist
 

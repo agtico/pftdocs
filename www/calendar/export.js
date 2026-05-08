@@ -57,7 +57,7 @@ define([
         var ICS = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//CryptPad//CryptPad Calendar '+Pages.versionString+'//EN',
+            'PRODID:-//PFT Docs//PFT Docs Calendar '+Pages.versionString+'//EN',
             'METHOD:PUBLISH',
         ];
 
@@ -422,5 +422,4 @@ define([
 
     return module;
 });
-
 
