@@ -29,6 +29,7 @@ define([
     '/app/postfiat/storage.js',
     '/app/postfiat/chat-state.js',
     '/app/postfiat/chat-context.js',
+    '/app/postfiat/docs-data.js',
     '/app/postfiat/superthink-engine.js',
     '/app/postfiat/peer-messages.js',
     '/app/postfiat/app-state.js',
@@ -39,7 +40,7 @@ define([
              PostFiatContacts, Icons, PostFiatWalletCoreBundle,
              PostFiatPrivateShareBundle, Marked, Hyperjson, TaskNodeFormat, Odv,
              AiProviders, RunPodConfig, RunPodClient, PostFiatStorage, ChatState,
-             ChatContext, SuperthinkEngine, PeerMessages, AppState) {
+             ChatContext, DocsData, SuperthinkEngine, PeerMessages, AppState) {
 
     var APP = {
         route: AppState.getInitialRoute(window.location.hash),
@@ -3553,94 +3554,13 @@ define([
         return result.relayUrl + ': ' + (result.message || 'Connection failed');
     };
 
-    var getUsableHref = function (value) {
-        var href = String(value || '');
-        if (href.indexOf('#') === -1) { return ''; }
-        return href;
-    };
+    var getUsableHref = DocsData.getUsableHref;
 
-    var getDocHref = function (doc, mode) {
-        if (mode === 'view') {
-            return getUsableHref(doc.roHref) || getUsableHref(doc.href);
-        }
-        return getUsableHref(doc.href) || getUsableHref(doc.roHref);
-    };
-
-    var getDocType = function (href) {
-        try {
-            return Hash.parsePadUrl(href).type || 'pad';
-        } catch (err) {
-            return 'pad';
-        }
-    };
-
-    var collectRootIds = function (root, out) {
-        out = out || {};
-        if (!root || typeof(root) !== 'object') { return out; }
-        Object.keys(root).forEach(function (key) {
-            var value = root[key];
-            if (typeof(value) === 'number' || typeof(value) === 'string') {
-                out[String(value)] = true;
-                return;
-            }
-            if (value && typeof(value) === 'object' && value.metadata !== true) {
-                collectRootIds(value, out);
-            }
-        });
-        return out;
-    };
-
-    var collectTrashIds = function (trash, out) {
-        out = out || {};
-        if (!trash || typeof(trash) !== 'object') { return out; }
-        Object.keys(trash).forEach(function (key) {
-            var list = trash[key];
-            if (!Array.isArray(list)) { return; }
-            list.forEach(function (entry) {
-                var value = entry && entry.element;
-                if (typeof(value) === 'number' || typeof(value) === 'string') {
-                    out[String(value)] = true;
-                    return;
-                }
-                collectRootIds(value, out);
-            });
-        });
-        return out;
-    };
+    var getDocHref = DocsData.getDocHref;
 
     var normalizeDriveDocs = function (driveObject) {
-        var drive = (driveObject && driveObject.drive) || {};
-        var filesData = drive.filesData || {};
-        var rootIds = collectRootIds(drive.root || {});
-        var trashIds = collectTrashIds(drive.trash || {});
-        var templateIds = {};
-        (drive.template || []).forEach(function (id) {
-            templateIds[String(id)] = true;
-        });
-        return Object.keys(filesData).map(function (id) {
-            var data = filesData[id] || {};
-            var href = getUsableHref(data.href);
-            var roHref = getUsableHref(data.roHref);
-            var bestHref = href || roHref;
-            return {
-                id: String(id),
-                title: data.filename || data.title || 'Untitled document',
-                href: href,
-                roHref: roHref,
-                type: getDocType(bestHref),
-                atime: data.atime || data.ctime || 0,
-                ctime: data.ctime || 0,
-                tags: data.tags || [],
-                root: Boolean(rootIds[String(id)]),
-                trash: Boolean(trashIds[String(id)]),
-                template: Boolean(templateIds[String(id)]),
-                channel: data.channel,
-                password: data.password || '',
-            };
-        }).filter(function (doc) {
-            return getDocHref(doc, 'view');
-        }).sort(function (a, b) {
-            return (b.atime || b.ctime || 0) - (a.atime || a.ctime || 0);
+        return DocsData.normalizeDriveDocs(driveObject, {
+            parsePadUrl: Hash.parsePadUrl
         });
     };
 
@@ -3675,22 +3595,9 @@ define([
         common.openUnsafeURL(href);
     };
 
-    var compactChatText = function (value) {
-        return String(value || '')
-            .replace(/\r\n/g, '\n')
-            .replace(/[ \t]+\n/g, '\n')
-            .replace(/\n{4,}/g, '\n\n\n')
-            .trim();
-    };
+    var compactChatText = DocsData.compactText;
 
-    var truncateChatText = function (value, limit) {
-        var text = compactChatText(value);
-        var omitted;
-        if (!limit || text.length <= limit) { return text; }
-        omitted = text.length - limit;
-        return text.slice(0, limit).trim() +
-            '\n\n[... ' + omitted.toLocaleString() + ' characters truncated ...]';
-    };
+    var truncateChatText = DocsData.truncateText;
 
     var getSelectedChatDocs = function () {
         var options = APP.chatOptions || getDefaultChatOptions();
@@ -3749,81 +3656,14 @@ define([
     };
 
     var hyperjsonToText = function (value) {
-        var node;
-        try {
-            node = Hyperjson.toDOM(value);
-            return compactChatText(node.textContent || node.innerText || '');
-        } catch (err) {
-            console.error(err);
-            return '';
-        }
+        return DocsData.hyperjsonToText(value, Hyperjson.toDOM);
     };
 
-    var isHyperjsonNode = function (value) {
-        return Array.isArray(value) && typeof(value[0]) === 'string' &&
-            value[1] && typeof(value[1]) === 'object' && Array.isArray(value[2]);
-    };
-
-    var extractChatDocText = function (value, depth) {
-        var parsed;
-        var keys;
-        var text;
-        if (value === null || typeof(value) === 'undefined') { return ''; }
-        if (value && value.tagName) {
-            return compactChatText(value.textContent || value.innerText || '');
-        }
-        if (typeof(value) === 'string') {
-            text = compactChatText(value);
-            if (/^[\[{]/u.test(text)) {
-                try {
-                    parsed = JSON.parse(text);
-                    return extractChatDocText(parsed, (depth || 0) + 1) || text;
-                } catch (err) {
-                    return text;
-                }
-            }
-            return text;
-        }
-        if (Array.isArray(value)) {
-            if (isHyperjsonNode(value)) {
-                return hyperjsonToText(value);
-            }
-            return compactChatText(value.map(function (entry) {
-                return extractChatDocText(entry, (depth || 0) + 1);
-            }).filter(Boolean).join('\n\n'));
-        }
-        if (typeof(value) === 'object') {
-            if ((depth || 0) > 4) {
-                try {
-                    return truncateChatText(JSON.stringify(value), 3000);
-                } catch (err) {
-                    return '';
-                }
-            }
-            keys = [
-                'content',
-                'text',
-                'markdown',
-                'body',
-                'html',
-                'userDoc',
-                'document',
-                'doc',
-                'data'
-            ];
-            for (var i = 0; i < keys.length; i++) {
-                if (typeof(value[keys[i]]) !== 'undefined') {
-                    text = extractChatDocText(value[keys[i]], (depth || 0) + 1);
-                    if (text) { return text; }
-                }
-            }
-            try {
-                return truncateChatText(JSON.stringify(value, null, 2), 5000);
-            } catch (err) {
-                return '';
-            }
-        }
-        return compactChatText(value);
+    var extractChatDocText = function (value) {
+        return DocsData.extractText(value, {
+            hyperjsonToText: hyperjsonToText,
+            truncateText: truncateChatText
+        });
     };
 
     var loadChatDocContent = function (doc) {

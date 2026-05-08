@@ -92,12 +92,15 @@ Done when:
 - [x] Move chat session, title, prompt-mode, and option normalization into `chat-state.js`.
 - [x] Add `scripts/tests/postfiat-chat-state.test.js`.
 - [x] Create `www/app/postfiat/chat-context.js`.
+- [x] Create `www/app/postfiat/docs-data.js`.
 - [ ] Create `src/postfiat/chat/context-pack.mjs`.
+- [x] Move Drive document normalization and chat document text extraction into a module.
 - [ ] Move selected document context section building into the module.
 - [x] Move Task Node recent-context packing into the module.
 - [x] Move historical task summary/relevance retrieval into the module.
 - [x] Document chat memory/cache keys in `DATA_CONTRACTS.md`.
 - [x] Add `scripts/tests/postfiat-chat-context.test.js`.
+- [x] Add `scripts/tests/postfiat-docs-data.test.js`.
 - [ ] Add `scripts/tests/postfiat-chat-context-pack.test.mjs`.
 - [x] Keep raw recent tasks available while using summaries for older history.
 - [ ] Fix chat scroll persistence so streaming does not jump to the top.
