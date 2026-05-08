@@ -129,7 +129,7 @@ Done when:
 - [x] Move RunPod model/GPU presets and Ollama boot defaults into `runpod-config.js`.
 - [x] Move RunPod pod payload construction into `runpod-config.js`.
 - [x] Add `scripts/tests/postfiat-runpod-config.test.js`.
-- [ ] Create `www/app/postfiat/runpod-client.js`.
+- [x] Create `www/app/postfiat/runpod-client.js`.
 - [ ] Create `www/app/postfiat/runpod-view.js`.
 - [ ] Share one RunPod readiness resolver across Chat and Superthink.
 - [ ] Document RunPod pod lifecycle in `AI_PROVIDERS.md`.

@@ -25,6 +25,7 @@ define([
     '/app/postfiat/odv.js',
     '/app/postfiat/ai-providers.js',
     '/app/postfiat/runpod-config.js',
+    '/app/postfiat/runpod-client.js',
     '/app/postfiat/storage.js',
     '/app/postfiat/chat-state.js',
     '/app/postfiat/chat-context.js',
@@ -37,8 +38,8 @@ define([
 ], function ($, ApiConfig, h, Util, Hash, UI, nThen, SFCommon, Messages, Clipboard,
              PostFiatContacts, Icons, PostFiatWalletCoreBundle,
              PostFiatPrivateShareBundle, Marked, Hyperjson, TaskNodeFormat, Odv,
-             AiProviders, RunPodConfig, PostFiatStorage, ChatState, ChatContext,
-             SuperthinkEngine, PeerMessages, AppState) {
+             AiProviders, RunPodConfig, RunPodClient, PostFiatStorage, ChatState,
+             ChatContext, SuperthinkEngine, PeerMessages, AppState) {
 
     var APP = {
         route: AppState.getInitialRoute(window.location.hash),
@@ -881,24 +882,16 @@ define([
     };
 
     var getRunPodPodModelId = function (pod) {
-        var env = pod && pod.env || {};
-        if (/ollama/ui.test(String(pod && (pod.name || pod.imageName || pod.image) || ''))) {
-            return String(env.PFT_MODEL_ID || env.OLLAMA_MODEL ||
-                RUNPOD_OLLAMA_DEFAULT_MODEL).trim() || RUNPOD_OLLAMA_DEFAULT_MODEL;
-        }
-        return String(env.PFT_MODEL_ID || env.AAO_MODEL_ID ||
-            APP.runPodSettings && APP.runPodSettings.modelId ||
-            RUNPOD_DEFAULT_MODEL).trim() || RUNPOD_DEFAULT_MODEL;
+        return RunPodClient.getPodModelId(pod, {
+            defaultModel: RUNPOD_DEFAULT_MODEL,
+            defaultOllamaModel: RUNPOD_OLLAMA_DEFAULT_MODEL,
+            settings: APP.runPodSettings
+        });
     };
 
-    var isRunPodPodRunning = function (pod) {
-        var state = String(pod && (pod.desiredStatus || pod.status || '')).toUpperCase();
-        return Boolean(pod && pod.id) && state !== 'EXITED' && state !== 'TERMINATED';
-    };
+    var isRunPodPodRunning = RunPodClient.isPodRunning;
 
-    var getRunPodPodSortTime = function (pod) {
-        return Date.parse(pod && (pod.lastStartedAt || pod.createdAt) || '') || 0;
-    };
+    var getRunPodPodSortTime = RunPodClient.getPodSortTime;
 
     var getLatestRunningRunPodPod = function () {
         return (APP.runPodPods || []).filter(isRunPodPodRunning).sort(function (a, b) {
@@ -909,7 +902,7 @@ define([
     var getLatestRunningRunPodOllamaPod = function () {
         return (APP.runPodPods || []).filter(function (pod) {
             return isRunPodPodRunning(pod) &&
-                /ollama/ui.test(String(pod && (pod.name || pod.imageName || pod.image) || ''));
+                RunPodClient.isOllamaPod(pod);
         }).sort(function (a, b) {
             return getRunPodPodSortTime(b) - getRunPodPodSortTime(a);
         })[0] || null;
@@ -920,14 +913,7 @@ define([
         return podId ? getRunPodProxyUrl(podId, 8000) + '/v1' : '';
     };
 
-    var parseRunPodModelIds = function (data) {
-        var records = Array.isArray(data && data.data) ? data.data :
-            (Array.isArray(data && data.models) ? data.models :
-                (Array.isArray(data) ? data : []));
-        return records.map(function (record) {
-            return String(record && (record.id || record.name || record.model) || '').trim();
-        }).filter(Boolean);
-    };
+    var parseRunPodModelIds = RunPodClient.parseModelIds;
 
     var checkRunPodAiEndpointReady = function (baseUrl, modelId) {
         baseUrl = normalizeOpenAiCompatibleBaseUrl(baseUrl);
@@ -976,7 +962,7 @@ define([
     var getLatestReadyRunPodOllamaPod = function () {
         return (APP.runPodPods || []).filter(function (pod) {
             return isRunPodPodRunning(pod) && isRunPodPodReady(pod) &&
-                /ollama/ui.test(String(pod && (pod.name || pod.imageName || pod.image) || ''));
+                RunPodClient.isOllamaPod(pod);
         }).sort(function (a, b) {
             return getRunPodPodSortTime(b) - getRunPodPodSortTime(a);
         })[0] || null;
@@ -1107,8 +1093,8 @@ define([
             APP.runPodPods = Array.isArray(pods) ? pods : [];
             candidates = (APP.runPodPods || []).filter(isRunPodPodRunning)
                 .sort(function (a, b) {
-                    var aOllama = /ollama/ui.test(String(a && (a.name || a.imageName || a.image) || '')) ? 1 : 0;
-                    var bOllama = /ollama/ui.test(String(b && (b.name || b.imageName || b.image) || '')) ? 1 : 0;
+                    var aOllama = RunPodClient.isOllamaPod(a) ? 1 : 0;
+                    var bOllama = RunPodClient.isOllamaPod(b) ? 1 : 0;
                     if (aOllama !== bOllama) { return bOllama - aOllama; }
                     return getRunPodPodSortTime(b) - getRunPodPodSortTime(a);
                 }).slice(0, 6);
@@ -1353,201 +1339,24 @@ define([
         render();
     };
 
-    var getRunPodApiUrls = function (path) {
-        var suffix = '/api/postfiat/runpod' + path;
-        var urls = [suffix];
-        var unsafeOrigin = String(ApiConfig.httpUnsafeOrigin || '').replace(/\/+$/u, '');
-        var currentOrigin = String(window.location.origin || '').replace(/\/+$/u, '');
-        var unsafeUrl = unsafeOrigin ? unsafeOrigin + suffix : '';
-        if (unsafeUrl && unsafeOrigin !== currentOrigin) { urls.push(unsafeUrl); }
-        return urls;
-    };
-
-    var makeRunPodFetchOptions = function (options, crossOrigin) {
-        var hasExplicitKey = options && Object.prototype.hasOwnProperty.call(options, 'key');
-        var key = hasExplicitKey ? options.key :
-            (options && options.skipDefaultKey ? '' : APP.runPodKey || '');
-        var headers = { Accept: options && options.accept || 'application/json' };
-        var body;
-        if (key) { headers.Authorization = 'Bearer ' + key; }
-        if (options && typeof(options.body) !== 'undefined') {
-            headers['Content-Type'] = 'application/json';
-            body = JSON.stringify(options.body);
-        }
-        var fetchOptions = {
-            method: options && options.method || 'GET',
-            credentials: crossOrigin ? 'omit' : 'same-origin',
-            headers: headers,
-            body: body
+    var getRunPodClientEnv = function () {
+        return {
+            currentOrigin: window.location.origin,
+            defaultKey: APP.runPodKey || '',
+            fetch: window.fetch && window.fetch.bind(window),
+            unsafeOrigin: ApiConfig.httpUnsafeOrigin
         };
-        if (crossOrigin) { fetchOptions.mode = 'cors'; }
-        return fetchOptions;
-    };
-
-    var parseRunPodResponse = function (response) {
-        return response.json().catch(function () { return {}; }).then(function (data) {
-            if (!response.ok) {
-                var err = new Error(data && (data.error || data.message) ||
-                    ('RunPod returned HTTP ' + response.status + '.'));
-                if (response.status === 404) { err.postFiatRetryableRunPod = true; }
-                throw err;
-            }
-            return data;
-        });
-    };
-
-    var normalizeRunPodFetchError = function (err) {
-        var message = err && err.message || '';
-        if (/Failed to fetch|NetworkError|Load failed/u.test(message)) {
-            return new Error('Unable to reach the PFT Docs RunPod proxy from this browser origin. Reload and try again; if it persists, the safe/unsafe origin route is blocked.');
-        }
-        return err;
-    };
-
-    var shouldRetryRunPodFetch = function (err) {
-        var message = err && err.message || '';
-        return Boolean(err && err.postFiatRetryableRunPod) ||
-            /Failed to fetch|NetworkError|Load failed/u.test(message);
     };
 
     var runPodFetchJson = function (path, options) {
-        var urls = getRunPodApiUrls(path);
-        var attempt = function (index) {
-            var url = urls[index];
-            var crossOrigin = /^https?:\/\//u.test(url) &&
-                String(url).indexOf(String(window.location.origin || '').replace(/\/+$/u, '')) !== 0;
-            return window.fetch(url, makeRunPodFetchOptions(options, crossOrigin)).then(parseRunPodResponse)
-                .catch(function (err) {
-                    if (index + 1 < urls.length && shouldRetryRunPodFetch(err)) {
-                        return attempt(index + 1);
-                    }
-                    throw normalizeRunPodFetchError(err);
-                });
-        };
-        return attempt(0);
+        return RunPodClient.fetchJson(path, options, getRunPodClientEnv());
     };
 
-    var extractRunPodStreamDelta = function (event) {
-        var choice = event && event.choices && event.choices[0] || {};
-        var delta = choice.delta || {};
-        return {
-            content: typeof(delta.content) === 'string' ? delta.content :
-                (typeof(event.delta) === 'string' ? event.delta : ''),
-            reasoning: typeof(delta.reasoning_content) === 'string' ? delta.reasoning_content :
-                (typeof(delta.reasoning) === 'string' ? delta.reasoning : '')
-        };
-    };
-
-    var extractAmbientStreamDelta = function (event) {
-        var type = String(event && event.type || '');
-        var delta = event && event.delta;
-        var text;
-        if (typeof(delta) === 'string') {
-            text = delta;
-        } else if (event && typeof(event.text) === 'string') {
-            text = event.text;
-        } else if (event && typeof(event.output_text) === 'string') {
-            text = event.output_text;
-        } else {
-            text = '';
-        }
-        return {
-            content: text && (/output|text/iu.test(type) || !type) ? text : '',
-            reasoning: text && /reasoning|thinking/iu.test(type) ? text : ''
-        };
-    };
-
-    var readSseTextResponse = function (response, handlers, extractDelta, errorLabel) {
-        var reader = response.body && response.body.getReader && response.body.getReader();
-        var decoder = new TextDecoder();
-        var buffer = '';
-        var output = '';
-        var reasoningChars = 0;
-        var processLine = function (line) {
-            var data;
-            var event;
-            var delta;
-            if (!line || line.indexOf('data:') !== 0) { return false; }
-            data = line.slice(5).trim();
-            if (!data) { return false; }
-            if (data === '[DONE]') { return true; }
-            try {
-                event = JSON.parse(data);
-            } catch (err) {
-                return false;
-            }
-            if (event && event.error) {
-                throw new Error(event.error.message || event.error ||
-                    ((errorLabel || 'AI') + ' stream failed.'));
-            }
-            delta = extractDelta(event);
-            if (delta.reasoning) {
-                reasoningChars += delta.reasoning.length;
-                if (handlers && typeof(handlers.onReasoningDelta) === 'function') {
-                    handlers.onReasoningDelta(delta.reasoning, reasoningChars);
-                }
-            }
-            if (delta.content) {
-                output += delta.content;
-                if (handlers && typeof(handlers.onDelta) === 'function') {
-                    handlers.onDelta(delta.content);
-                }
-            }
-            return false;
-        };
-        var pump = function () {
-            return reader.read().then(function (chunk) {
-                var lines;
-                var done;
-                if (chunk.done) {
-                    if (buffer) { processLine(buffer); }
-                    return output;
-                }
-                buffer += decoder.decode(chunk.value, { stream: true });
-                lines = buffer.split(/\r?\n/u);
-                buffer = lines.pop() || '';
-                done = lines.some(processLine);
-                return done ? output : pump();
-            });
-        };
-        if (!reader) {
-            return Promise.reject(new Error((errorLabel || 'AI') +
-                ' stream response is unreadable.'));
-        }
-        return pump();
-    };
-
-    var readRunPodSseResponse = function (response, handlers) {
-        return readSseTextResponse(response, handlers, extractRunPodStreamDelta, 'RunPod');
-    };
+    var readSseTextResponse = RunPodClient.readSseTextResponse;
+    var extractAmbientStreamDelta = RunPodClient.extractAmbientStreamDelta;
 
     var runPodFetchSse = function (path, options, handlers) {
-        var urls = getRunPodApiUrls(path);
-        var attempt = function (index) {
-            var url = urls[index];
-            var crossOrigin = /^https?:\/\//u.test(url) &&
-                String(url).indexOf(String(window.location.origin || '').replace(/\/+$/u, '')) !== 0;
-            var fetchOptions = makeRunPodFetchOptions(Object.assign({}, options || {}, {
-                accept: 'text/event-stream'
-            }), crossOrigin);
-            return window.fetch(url, fetchOptions).then(function (response) {
-                if (!response.ok) {
-                    return response.json().catch(function () { return {}; }).then(function (data) {
-                        var err = new Error(data && (data.error || data.message) ||
-                            ('RunPod returned HTTP ' + response.status + '.'));
-                        if (response.status === 404) { err.postFiatRetryableRunPod = true; }
-                        throw err;
-                    });
-                }
-                return readRunPodSseResponse(response, handlers);
-            }).catch(function (err) {
-                if (index + 1 < urls.length && shouldRetryRunPodFetch(err)) {
-                    return attempt(index + 1);
-                }
-                throw normalizeRunPodFetchError(err);
-            });
-        };
-        return attempt(0);
+        return RunPodClient.fetchSse(path, options, handlers, getRunPodClientEnv());
     };
 
     var loadRunPodGpuTypes = function (force) {
@@ -1606,9 +1415,7 @@ define([
         );
     };
 
-    var getRunPodProxyUrl = function (podId, port) {
-        return 'https://' + podId + '-' + (port || 8000) + '.proxy.runpod.net';
-    };
+    var getRunPodProxyUrl = RunPodClient.getProxyUrl;
 
     var refreshRunPodPods = function () {
         var key = getRunPodInputKey();
