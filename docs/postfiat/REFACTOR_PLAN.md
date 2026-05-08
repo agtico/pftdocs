@@ -41,6 +41,8 @@ The first extraction tranche on `refactor/pftdocs-tooling` moved pure browser lo
 | `www/app/postfiat/ai-providers.js` | Ambient/OpenRouter/RunPod request payload construction |
 | `www/app/postfiat/odv.js` | ODV prompt text and `FULL RESPONSE` extraction/fallback behavior |
 | `www/app/postfiat/runpod-config.js` | RunPod model/GPU presets, Ollama boot defaults, pod payload construction |
+| `www/app/postfiat/superthink-engine.js` | Superthink persona parsing, voice contracts, prompt construction, transcript/final report helpers |
+| `www/app/postfiat/peer-messages.js` | Nostr peer-message state normalization, recipient parsing, conversation upsert/append behavior |
 
 Current first-tranche line counts:
 

@@ -133,10 +133,13 @@ Done when:
 - [ ] Create `www/app/postfiat/runpod-view.js`.
 - [ ] Share one RunPod readiness resolver across Chat and Superthink.
 - [ ] Document RunPod pod lifecycle in `AI_PROVIDERS.md`.
+- [x] Create `www/app/postfiat/superthink-engine.js`.
 - [ ] Create `src/postfiat/ai/superthink.mjs`.
-- [ ] Move Superthink selector, persona-voice, round, manager, and final-report prompts into the module.
+- [x] Move Superthink selector, persona-voice, manager, and final-report prompts into the module.
+- [ ] Move Superthink round orchestration into the module.
 - [ ] Make later rounds receive prior-round summary and prior persona names.
-- [ ] Enforce persona-specific rhetorical style without raising temperature.
+- [x] Enforce persona-specific rhetorical style without raising temperature.
+- [x] Add `scripts/tests/postfiat-superthink-engine.test.js`.
 - [ ] Add `scripts/tests/postfiat-superthink-prompt.test.mjs`.
 - [ ] Add `scripts/tests/postfiat-runpod-readiness.test.mjs`.
 
@@ -154,7 +157,7 @@ Done when:
 - [ ] Create `www/app/postfiat/tasknode-view.js`.
 - [ ] Create `www/app/postfiat/chat-view.js`.
 - [ ] Create `www/app/postfiat/superthink-view.js`.
-- [ ] Create `www/app/postfiat/peer-messages.js`.
+- [x] Create `www/app/postfiat/peer-messages.js`.
 - [ ] Create `www/app/postfiat/wallet-session.js`.
 - [ ] Move one route at a time and run `node --check www/app/inner.js` after each move.
 
