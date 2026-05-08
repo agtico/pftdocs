@@ -116,13 +116,16 @@ Done when:
 ## Burn 5: Extract AI Provider Adapters
 
 - [x] Create `www/app/postfiat/ai-providers.js`.
+- [x] Create `www/app/postfiat/openrouter-catalog.js`.
 - [x] Move Ambient request payload helpers into provider adapter.
 - [x] Move OpenRouter request payload and ZDR/provider config helpers into provider adapter.
+- [x] Move OpenRouter model/ZDR catalog parsing and status text into `openrouter-catalog.js`.
 - [x] Move RunPod OpenAI/Ollama request payload helpers into provider adapter.
 - [x] Create `www/app/postfiat/odv.js`.
 - [x] Move ODV prompt selection and `FULL RESPONSE |` extraction into `odv.js`.
 - [x] Normalize ODV fallback behavior when a model omits the pipe delimiter.
 - [x] Add `scripts/tests/postfiat-ai-provider-request.test.js`.
+- [x] Add `scripts/tests/postfiat-openrouter-catalog.test.js`.
 
 Done when:
 

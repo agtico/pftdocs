@@ -41,6 +41,7 @@ The first extraction tranche on `refactor/pftdocs-tooling` moved pure browser lo
 | `www/app/postfiat/chat-context.js` | Task Node chat context packing: recent raw detail plus older summaries/relevance retrieval |
 | `www/app/postfiat/docs-data.js` | Drive document normalization, href selection, text compaction/truncation, chat document extraction |
 | `www/app/postfiat/ai-providers.js` | Ambient/OpenRouter/RunPod request payload construction |
+| `www/app/postfiat/openrouter-catalog.js` | OpenRouter model/ZDR endpoint normalization, filtering, and status text |
 | `www/app/postfiat/odv.js` | ODV prompt text and `FULL RESPONSE` extraction/fallback behavior |
 | `www/app/postfiat/runpod-config.js` | RunPod model/GPU presets, Ollama boot defaults, pod payload construction |
 | `www/app/postfiat/runpod-client.js` | RunPod proxy fetch/SSE parsing, pod readiness primitives, proxy URL/model helpers |

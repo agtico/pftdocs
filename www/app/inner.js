@@ -25,6 +25,7 @@ define([
     '/app/postfiat/tasknode-cache.js',
     '/app/postfiat/odv.js',
     '/app/postfiat/ai-providers.js',
+    '/app/postfiat/openrouter-catalog.js',
     '/app/postfiat/runpod-config.js',
     '/app/postfiat/runpod-client.js',
     '/app/postfiat/storage.js',
@@ -40,9 +41,9 @@ define([
 ], function ($, ApiConfig, h, Util, Hash, UI, nThen, SFCommon, Messages, Clipboard,
              PostFiatContacts, Icons, PostFiatWalletCoreBundle,
              PostFiatPrivateShareBundle, Marked, Hyperjson, TaskNodeFormat,
-             TaskNodeCache, Odv, AiProviders, RunPodConfig, RunPodClient,
-             PostFiatStorage, ChatState, ChatContext, DocsData, SuperthinkEngine,
-             PeerMessages, AppState) {
+             TaskNodeCache, Odv, AiProviders, OpenRouterCatalog, RunPodConfig,
+             RunPodClient, PostFiatStorage, ChatState, ChatContext, DocsData,
+             SuperthinkEngine, PeerMessages, AppState) {
 
     var APP = {
         route: AppState.getInitialRoute(window.location.hash),
@@ -1564,107 +1565,42 @@ define([
         });
     };
 
-    var normalizeOpenRouterModelRecord = function (record) {
-        var id = String(record && (record.id || record.model_id) || '').trim();
-        if (!id) { return null; }
-        return {
-            id: id,
-            name: String(record.name || record.model_name || id),
-            contextLength: Number(record.context_length || 0) || 0
-        };
-    };
+    var parseOpenRouterModels = OpenRouterCatalog.parseModels;
 
-    var parseOpenRouterModels = function (data) {
-        var seen = {};
-        var records = Array.isArray(data && data.data) ? data.data : [];
-        return records.map(normalizeOpenRouterModelRecord).filter(function (model) {
-            if (!model || seen[model.id]) { return false; }
-            seen[model.id] = true;
-            return true;
-        }).sort(function (a, b) {
-            return a.name.localeCompare(b.name);
-        });
-    };
-
-    var parseOpenRouterZdrEndpoints = function (data) {
-        var records = Array.isArray(data && data.data) ? data.data : [];
-        return records.map(function (record) {
-            return {
-                modelId: String(record.model_id || record.id || '').trim(),
-                modelName: String(record.model_name || record.name || ''),
-                providerName: String(record.provider_name || ''),
-                tag: String(record.tag || ''),
-                contextLength: Number(record.context_length || 0) || 0,
-                supportsImplicitCaching: !!record.supports_implicit_caching
-            };
-        }).filter(function (endpoint) {
-            return !!endpoint.modelId;
-        });
-    };
+    var parseOpenRouterZdrEndpoints = OpenRouterCatalog.parseZdrEndpoints;
 
     var getOpenRouterZdrModelIdMap = function () {
-        var map = {};
-        APP.openRouterZdrEndpoints.forEach(function (endpoint) {
-            map[endpoint.modelId] = true;
-        });
-        return map;
+        return OpenRouterCatalog.getZdrModelIdMap(APP.openRouterZdrEndpoints);
     };
 
     var countOpenRouterZdrModels = function () {
-        return Object.keys(getOpenRouterZdrModelIdMap()).length;
+        return OpenRouterCatalog.countZdrModels(APP.openRouterZdrEndpoints);
     };
 
     var getOpenRouterModelCatalog = function () {
-        var models = APP.openRouterModels.length ? APP.openRouterModels : OPENROUTER_FALLBACK_MODELS;
-        var modelMap = {};
-        var selected = APP.aiSettings && APP.aiSettings.openRouterModel || OPENROUTER_DEFAULT_MODEL;
-        var zdrMap = getOpenRouterZdrModelIdMap();
-        var hasZdrFilter = APP.openRouterZdrEndpoints.length > 0;
-        models.forEach(function (model) {
-            if (APP.aiSettings && APP.aiSettings.openRouterZdrOnly && hasZdrFilter && !zdrMap[model.id]) {
-                return;
-            }
-            modelMap[model.id] = model;
-        });
-        if (selected && !modelMap[selected]) {
-            modelMap[selected] = {
-                id: selected,
-                name: selected + (hasZdrFilter && !zdrMap[selected] ? ' (not in current ZDR list)' : '')
-            };
-        }
-        return Object.keys(modelMap).map(function (id) {
-            return modelMap[id];
-        }).sort(function (a, b) {
-            return a.name.localeCompare(b.name);
+        return OpenRouterCatalog.getModelCatalog({
+            fallbackModels: OPENROUTER_FALLBACK_MODELS,
+            models: APP.openRouterModels,
+            selectedModel: APP.aiSettings && APP.aiSettings.openRouterModel ||
+                OPENROUTER_DEFAULT_MODEL,
+            zdrEndpoints: APP.openRouterZdrEndpoints,
+            zdrOnly: APP.aiSettings && APP.aiSettings.openRouterZdrOnly
         });
     };
 
     var getOpenRouterZdrProvidersForModel = function (modelId) {
-        var names = {};
-        APP.openRouterZdrEndpoints.forEach(function (endpoint) {
-            if (endpoint.modelId === modelId && endpoint.providerName) {
-                names[endpoint.providerName] = true;
-            }
-        });
-        return Object.keys(names).sort();
+        return OpenRouterCatalog.getZdrProvidersForModel(
+            APP.openRouterZdrEndpoints, modelId);
     };
 
     var getOpenRouterModelStatus = function () {
-        var selected = APP.aiSettings && APP.aiSettings.openRouterModel || OPENROUTER_DEFAULT_MODEL;
-        var providers = getOpenRouterZdrProvidersForModel(selected);
-        if (APP.openRouterModelsLoading) {
-            return 'Loading OpenRouter models and ZDR endpoint data...';
-        }
-        if (providers.length) {
-            return 'Selected model has ' + providers.length +
-                ' ZDR endpoint(s): ' + providers.slice(0, 6).join(', ') +
-                (providers.length > 6 ? ', ...' : '') + '.';
-        }
-        if (APP.openRouterZdrEndpoints.length) {
-            return 'Selected model is not present in the current OpenRouter ZDR endpoint list.';
-        }
-        return APP.openRouterModelsStatus ||
-            'Using fallback model list until OpenRouter model data is loaded.';
+        return OpenRouterCatalog.getModelStatus({
+            loading: APP.openRouterModelsLoading,
+            selectedModel: APP.aiSettings && APP.aiSettings.openRouterModel ||
+                OPENROUTER_DEFAULT_MODEL,
+            status: APP.openRouterModelsStatus,
+            zdrEndpoints: APP.openRouterZdrEndpoints
+        });
     };
 
     var buildOpenRouterRequestDefaults = function () {
