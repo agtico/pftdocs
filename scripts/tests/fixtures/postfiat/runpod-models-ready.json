@@ -1,0 +1,10 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "qwen3.6:27b",
+      "object": "model",
+      "owned_by": "ollama"
+    }
+  ]
+}

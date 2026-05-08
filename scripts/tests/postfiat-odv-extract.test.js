@@ -9,24 +9,23 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const innerSource = fs.readFileSync(
-    path.join(repoRoot, 'www/app/inner.js'),
-    'utf8'
-);
 
 const loadExtractor = () => {
-    const start = innerSource.indexOf('    var trimOdvTrailingPipe');
-    const end = innerSource.indexOf('    var buildChatMessages', start);
-    assert.notEqual(start, -1);
-    assert.notEqual(end, -1);
-    const context = {};
-    vm.createContext(context);
-    vm.runInContext(
-        innerSource.slice(start, end) +
-            '\nthis.extractOdvFullResponseText = extractOdvFullResponseText;',
-        context
+    const source = fs.readFileSync(
+        path.join(repoRoot, 'www/app/postfiat/odv.js'),
+        'utf8'
     );
-    return context.extractOdvFullResponseText;
+    const context = {
+        moduleValue: null,
+        define: (deps, factory) => {
+            assert.equal(Array.isArray(deps), true);
+            assert.equal(deps.length, 0);
+            context.moduleValue = factory();
+        },
+    };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    return context.moduleValue.extractFullResponseText;
 };
 
 test('ODV extractor uses exact FULL RESPONSE pipe delimiter when present', () => {

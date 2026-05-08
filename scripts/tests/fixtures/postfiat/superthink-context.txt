@@ -1,0 +1,1 @@
+The user is fixing PFT Docs and Task Node usability. Recent work includes RunPod Qwen integration, Superthink historical persona synthesis, Task Node history caching, AI provider configuration, and removing confusing upstream branding. The current concern is making the system maintainable and fast enough for real usage.

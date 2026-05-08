@@ -13,8 +13,8 @@ define(['/common/translations/messages.js'], function (Messages) {
     var rebrandText = function (value) {
         if (typeof(value) !== 'string') { return value; }
         return value
-            .replace(/\bCryptDrives\b/g, 'Drives')
-            .replace(/\bCryptDrive\b/g, 'Drive')
+            .replace(/\bCryptDrives\b/g, 'Documents')
+            .replace(/\bCryptDrive\b/g, 'Documents')
             .replace(/\bCryptPad\b/g, 'PFT Docs')
             .replace(/\bcryptpad\.org\b/g, 'postfiat.org')
             .replace(/I love PFT Docs/g, 'I understand');
@@ -34,8 +34,8 @@ define(['/common/translations/messages.js'], function (Messages) {
     rebrandObject(Messages);
 
     Messages.main_title = 'PFT Docs';
-    if (Messages.type) { Messages.type.drive = 'Drive'; }
-    Messages.header_logoTitle = 'Go to your Drive';
+    if (Messages.type) { Messages.type.drive = 'Documents'; }
+    Messages.header_logoTitle = 'Go to your documents';
     Messages.header_homeTitle = 'Go to PFT Docs';
     Messages.label_logo = 'PFT Docs logo';
     Messages.og_default = 'PFT Docs: end-to-end encrypted collaboration';

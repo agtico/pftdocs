@@ -1,0 +1,9 @@
+{
+  "provider": "runpod",
+  "ambientBaseUrl": "https://api.ambient.xyz",
+  "ambientModel": "ambient/large",
+  "openrouterBaseUrl": "https://openrouter.ai/api/v1",
+  "openrouterModel": "deepseek/deepseek-v4-flash",
+  "runPodBaseUrl": "https://example-8000.proxy.runpod.net/v1",
+  "runPodModel": "qwen3.6:27b"
+}

@@ -1,0 +1,117 @@
+{
+  "walletAddress": "rExampleWalletAddressForTests",
+  "taskEventCount": 3,
+  "contextUpdateCount": 1,
+  "latestContext": {
+    "cid": "bafkrei-context",
+    "txHash": "ABC123",
+    "createdAt": "2026-05-01T12:00:00.000Z",
+    "text": "Current operating brief: finish Task Node usability, then return to trading validation."
+  },
+  "taskEvents": [
+    {
+      "cid": "bafkrei-task",
+      "txHash": "TASKTX",
+      "taskId": "task-1",
+      "kindLabel": "TASK_SUBMISSION",
+      "createdAt": "2026-05-01T11:00:00.000Z",
+      "payload": {
+        "phase": "submission",
+        "task_history": {
+          "task": {
+            "id": "task-1",
+            "title": "Patch Task Node motivation quality",
+            "description": "Improve the task motivation prompt so it explains why work matters to the Post Fiat network.",
+            "alignment": "Task Node usability finalization"
+          },
+          "events": [
+            {
+              "event_type": "task_accepted",
+              "created_at": "2026-05-01T11:05:00.000Z"
+            }
+          ]
+        },
+        "artifact": {
+          "response": "Implemented a prompt-level motivation quality pass and verified the generated task rationale."
+        }
+      }
+    },
+    {
+      "cid": "bafkrei-reward",
+      "txHash": "REWARDTX",
+      "taskId": "task-1",
+      "kindLabel": "REWARD",
+      "createdAt": "2026-05-01T11:20:00.000Z",
+      "payload": {
+        "schema": "pf.reward.v1",
+        "reward_pft": "5357",
+        "reward_summary": "Accepted. The motivation quality pass is scoped and useful.",
+        "reward_payload": {
+          "reward_tier": "accepted",
+          "score": "92"
+        }
+      }
+    },
+    {
+      "cid": "bafkrei-verify",
+      "txHash": "VERIFYTX",
+      "taskId": "task-1",
+      "kindLabel": "VERIFICATION_RESPONSE",
+      "createdAt": "2026-05-01T11:10:00.000Z",
+      "payload": {
+        "phase": "verification_response",
+        "response": "Submitted a code diff and fixture-backed validation notes."
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "task-1",
+      "events": [
+        {
+          "cid": "bafkrei-reward",
+          "txHash": "REWARDTX",
+          "taskId": "task-1",
+          "kindLabel": "REWARD",
+          "createdAt": "2026-05-01T11:20:00.000Z",
+          "payload": {
+            "schema": "pf.reward.v1",
+            "reward_pft": "5357",
+            "reward_summary": "Accepted. The motivation quality pass is scoped and useful.",
+            "reward_payload": {
+              "reward_tier": "accepted",
+              "score": "92"
+            }
+          }
+        },
+        {
+          "cid": "bafkrei-task",
+          "txHash": "TASKTX",
+          "taskId": "task-1",
+          "kindLabel": "TASK_SUBMISSION",
+          "createdAt": "2026-05-01T11:00:00.000Z",
+          "payload": {
+            "phase": "submission",
+            "task_history": {
+              "task": {
+                "id": "task-1",
+                "title": "Patch Task Node motivation quality",
+                "description": "Improve the task motivation prompt so it explains why work matters to the Post Fiat network.",
+                "alignment": "Task Node usability finalization"
+              },
+              "events": [
+                {
+                  "event_type": "task_accepted",
+                  "created_at": "2026-05-01T11:05:00.000Z"
+                }
+              ]
+            },
+            "artifact": {
+              "response": "Implemented a prompt-level motivation quality pass and verified the generated task rationale."
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
