@@ -7,18 +7,30 @@ define([
     '/common/cache-store.js',
     '/components/nthen/index.js',
 ], function (localForage, Cache, nThen) {
+    var cryptpadStorePrefix = 'CRYPTPAD_STORE|';
     var preservedLocalKeys = [
         'PFT_wallet_vault',
         'PFT_ai_provider_keys_v1',
         'PFT_ai_provider_settings_v1',
+        'PFT_runpod_api_key_v1',
+        'PFT_runpod_settings_v1',
         'PFT_ai_chat_sessions_v1',
         'PFT_ai_chat_options_v1',
+        'PFT_nostr_peer_messages_v1',
         'PFT_tasknode_ipfs_json_v1:index',
     ];
     var preservedLocalPrefixes = [
         'PFT_tasknode_ipfs_json_v1:',
+        'PFT_ai_chat_memory_v1:',
+        'PFT_ai_chat_context_pack_v1:',
     ];
+    var normalizeCryptpadStoreKey = function (key) {
+        key = String(key || '');
+        return key.indexOf(cryptpadStorePrefix) === 0 ?
+            key.slice(cryptpadStorePrefix.length) : key;
+    };
     var shouldPreserveLocalKey = function (key) {
+        key = normalizeCryptpadStoreKey(key);
         if (preservedLocalKeys.indexOf(key) !== -1) { return true; }
         return preservedLocalPrefixes.some(function (prefix) {
             return key.indexOf(prefix) === 0;

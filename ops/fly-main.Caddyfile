@@ -1,0 +1,5 @@
+:8080 {
+    @websocket path /cryptpad_websocket*
+    reverse_proxy @websocket 127.0.0.1:3003
+    reverse_proxy 127.0.0.1:3000
+}

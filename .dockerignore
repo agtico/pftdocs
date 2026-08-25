@@ -8,11 +8,13 @@
 .gitignore
 .gitmodules
 .github
+.postfiat-onion
 .reuse
 .stylelintrc.js
 .eslint.config.js
 docker-compose.yml
 Dockerfile*
+node_modules
 *.png
 *.md
 /onlyoffice-builds.git/

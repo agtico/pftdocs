@@ -603,7 +603,16 @@ define([
 
                 oldContent = undefined;
 
-                if (!readOnly) { onLocal(); }
+                if (!readOnly) {
+                    if (privateDat.taskNodeBootstrap) {
+                        cpNfInner.chainpad.onSettle(function () {
+                            common.getSframeChannel().event('EV_TASKNODE_PAD_INITIALIZED', {
+                                requestId: privateDat.taskNodeBootstrap
+                            });
+                        });
+                    }
+                    onLocal();
+                }
                 evOnReady.fire(newPad);
 
                 // In forms, only editors can see the chat
@@ -880,6 +889,36 @@ define([
             SFCommon.create(waitFor(function (c) { common = c; }));
         }).nThen(function (waitFor) {
             common.getSframeChannel().onReady(waitFor());
+            common.getSframeChannel().on('EV_TASKNODE_COMMAND', function (data) {
+                if (String(data && data.command || '') !== 'import-content') { return; }
+                var importData = data && data.file || {};
+                var importName = String(importData.name || '').trim().slice(0, 180);
+                var importContent = String(importData.content || '').slice(0, 8 * 1024 * 1024);
+                var respond = function (ok, error) {
+                    common.getSframeChannel().event('EV_TASKNODE_IMPORT_RESULT', {
+                        ok: ok === true,
+                        fileName: importName,
+                        error: String(error || '').slice(0, 500)
+                    });
+                };
+                if (readOnly || state !== STATE.READY || unsyncMode || !fileImporter) {
+                    respond(false, 'The document is not ready for imports.');
+                    return;
+                }
+                if (!/\.(?:md|txt|html?)$/i.test(importName) || !importContent) {
+                    respond(false, 'Choose a Markdown, text, or HTML file.');
+                    return;
+                }
+                try {
+                    var file = new File([importContent], importName, {
+                        type: String(importData.mimeType || 'text/plain').slice(0, 120)
+                    });
+                    UIElements.importContent('text/plain', fileImporter, {})(file);
+                    respond(true);
+                } catch (error) {
+                    respond(false, error && error.message || 'PFDocs could not import that file.');
+                }
+            });
         }).nThen(function (waitFor) {
             //Test.registerInner(common.getSframeChannel());
             common.handleNewFile(waitFor);

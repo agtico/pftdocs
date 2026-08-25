@@ -116,6 +116,9 @@ module.exports = {
     postFiat: {
         walletFirst: true,
         disableLegacyLogin: true,
+        // Exact origins allowed to request a new encrypted pad capability from
+        // /tasknode/. Never use "*" here.
+        taskNodeOrigins: ['http://localhost:5173', 'http://localhost:8080'],
         pftl: {
             networkId: 2025,
             rpcUrl: '',
@@ -220,7 +223,7 @@ module.exports = {
      *
      *  defaults to 90 days if nothing is provided
      */
-    //inactiveTime: 90, // days
+    inactiveTime: 180, // days; bounded retention for abandoned anonymous pads
 
     /*  CryptPad archives some data instead of deleting it outright.
      *  This archived data still takes up space and so you'll probably still want to
@@ -235,7 +238,7 @@ module.exports = {
      *
      *  defaults to 15 days if nothing is provided
      */
-    //archiveRetentionTime: 15,
+    archiveRetentionTime: 30,
 
     /*  It's possible to configure your instance to remove data
      *  stored on behalf of inactive accounts. Set 'accountRetentionTime'
@@ -261,7 +264,7 @@ module.exports = {
      *  anything larger than this size will be rejected
      *  defaults to 20MB if no value is provided
      */
-    //maxUploadSize: 20 * 1024 * 1024,
+    maxUploadSize: 20 * 1024 * 1024,
 
     /*  Users with premium accounts (those with a plan included in their customLimit)
      *  can benefit from an increased upload size limit. By default they are restricted to the same

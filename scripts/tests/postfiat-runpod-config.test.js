@@ -92,6 +92,30 @@ test('RunPod custom GPU selection parses comma and newline lists', () => {
     assert.deepEqual(Array.from(ids), ['GPU A', 'GPU B']);
 });
 
+test('RunPod model presets include Huihui Qwen 3.5 abliterated as Ollama-native', () => {
+    const config = loadRunPodConfig();
+    const modelId = 'huihui_ai/qwen3.5-abliterated';
+    const preset = config.RUNPOD_MODEL_PRESETS.find((entry) => entry.id === modelId);
+    const settings = config.normalizeRunPodSettings({
+        modelPreset: modelId,
+        modelId,
+    });
+    const payload = config.buildPodPayload(settings, ['NVIDIA H200']);
+
+    assert.equal(config.RUNPOD_HUIHUI_QWEN35_ABLITERATED_MODEL, modelId);
+    assert.equal(preset.label, 'Huihui Qwen 3.5 27B Abliterated');
+    assert.equal(config.isRunPodNativeOllamaModel(modelId), true);
+    assert.deepEqual(Array.from(config.getRunPodModelAliases(modelId)), [
+        modelId,
+        `${modelId}:latest`,
+    ]);
+    assert.equal(config.isRunPodModelAvailable(modelId, [`${modelId}:latest`]), true);
+    assert.equal(config.isRunPodModelAvailable('qwen3.6:27b', ['qwen3.6:latest']), false);
+    assert.equal(settings.modelPreset, modelId);
+    assert.equal(settings.modelId, modelId);
+    assert.equal(payload.env.PFT_MODEL_ID, modelId);
+});
+
 test('RunPod pod payload boots Ollama with fast Qwen settings', () => {
     const config = loadRunPodConfig();
     const payload = config.buildPodPayload({

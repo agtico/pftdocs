@@ -885,6 +885,10 @@ define([
         return String(settings.runPodModel || RUNPOD_DEFAULT_MODEL).trim() || RUNPOD_DEFAULT_MODEL;
     };
 
+    var isRunPodNativeOllamaModel = function (modelId) {
+        return RunPodConfig.isRunPodNativeOllamaModel(modelId || getRunPodAiModel());
+    };
+
     var getRunPodPodModelId = function (pod) {
         return RunPodClient.getPodModelId(pod, {
             defaultModel: RUNPOD_DEFAULT_MODEL,
@@ -931,7 +935,7 @@ define([
         }).then(function (data) {
             var modelIds = parseRunPodModelIds(data);
             return {
-                ready: modelIds.indexOf(modelId) !== -1,
+                ready: RunPodConfig.isRunPodModelAvailable(modelId, modelIds),
                 modelIds: modelIds
             };
         });
@@ -1004,7 +1008,7 @@ define([
             skipDefaultKey: true
         }).then(function (data) {
             var modelIds = parseRunPodModelIds(data);
-            var ready = modelIds.indexOf(modelId) !== -1;
+            var ready = RunPodConfig.isRunPodModelAvailable(modelId, modelIds);
             if (ready) {
                 setRunPodPodReadiness(podId, 'ready', 'Ready: ' + modelId, modelIds);
                 if (!getRunPodAiBaseUrl() && APP.aiSettings &&
@@ -1142,7 +1146,8 @@ define([
             if (selected) { return true; }
             if (!baseUrl && !APP.runPodKey) { return false; }
             setAiKeyStatus('runpod', 'warn',
-                'No ready RunPod model found. Start a pod, wait for qwen3.6:27b to appear, then run again.');
+                'No ready RunPod model found. Start a pod, wait for ' +
+                    modelId + ' to appear, then run again.');
             return false;
         }).catch(function (err) {
             console.error(err);
@@ -1815,7 +1820,7 @@ define([
         var thinking = isChatThinkingEnabled(options);
         var stream = handlers && typeof(handlers.onDelta) === 'function';
         var model = getRunPodAiModel();
-        var nativeOllama = /^qwen3\.6:/u.test(model);
+        var nativeOllama = isRunPodNativeOllamaModel(model);
         var payload;
         if (!baseUrl) {
             return Promise.reject(new Error('No RunPod endpoint is configured. Add one on the AI page or use a running pod from RunPod Compute.'));
@@ -1900,7 +1905,7 @@ define([
     var callRunPodMemoryChat = function (messages) {
         var baseUrl = getRunPodAiBaseUrl();
         var model = getRunPodAiModel();
-        var nativeOllama = /^qwen3\.6:/u.test(model);
+        var nativeOllama = isRunPodNativeOllamaModel(model);
         var payload;
         if (!baseUrl) {
             return Promise.reject(new Error('RunPod memory endpoint is not configured.'));
@@ -2380,7 +2385,7 @@ define([
     var callRunPodSuperthink = function (messages, maxTokens, label) {
         var baseUrl = getRunPodAiBaseUrl();
         var model = getRunPodAiModel();
-        var nativeOllama = /^qwen3\.6:/u.test(model);
+        var nativeOllama = isRunPodNativeOllamaModel(model);
         var startedAt = Date.now();
         var payload;
         if (!baseUrl) {
@@ -5513,7 +5518,7 @@ define([
             baseUrl: getRunPodAiBaseUrl(settings),
             model: settings.runPodModel || RUNPOD_DEFAULT_MODEL,
             max_tokens: isChatThinkingEnabled(chatOptions) ? 4096 : 2048,
-            nativeOllama: /^qwen3\.6:/u.test(String(settings.runPodModel || RUNPOD_DEFAULT_MODEL)),
+            nativeOllama: isRunPodNativeOllamaModel(settings.runPodModel || RUNPOD_DEFAULT_MODEL),
             ollamaThink: isChatThinkingEnabled(chatOptions)
         }, null, 2);
         var runningPods = (APP.runPodPods || []).filter(isRunPodPodRunning);
@@ -5556,7 +5561,8 @@ define([
             h('div.pft-panel-heading', [
                 h('div', [
                     h('h2', 'RunPod endpoint'),
-                    h('div.pft-view-meta', 'Ollama server on port 8000; the proxy uses native /api/chat for qwen3.6')
+                    h('div.pft-view-meta',
+                        'Ollama server on port 8000; known Ollama presets use native /api/chat')
                 ]),
                 h('span.pft-pill' + (getRunPodAiBaseUrl(settings) ? '.pft-ok' : '.pft-warn'),
                     getRunPodAiBaseUrl(settings) ? 'Configured' : 'Missing endpoint')

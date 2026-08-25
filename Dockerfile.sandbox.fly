@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+FROM caddy:2-alpine
+COPY ops/fly-sandbox.Caddyfile /etc/caddy/Caddyfile

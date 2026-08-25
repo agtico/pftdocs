@@ -1,0 +1,34 @@
+app = "tasknode-pfdocs"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  PFDOCS_MAIN_ORIGIN = "https://tasknode-pfdocs.fly.dev"
+  PFDOCS_SANDBOX_ORIGIN = "https://tasknode-pfdocs-sandbox.fly.dev"
+  PFDOCS_TASKNODE_ORIGINS = "https://tasknode.postfiat.org"
+  PFDOCS_DATA_ROOT = "/data"
+
+[mounts]
+  source = "pfdocs_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "90s"
+    method = "GET"
+    path = "/api/config"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory = "2gb"

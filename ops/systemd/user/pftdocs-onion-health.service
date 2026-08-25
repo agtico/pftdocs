@@ -1,0 +1,10 @@
+[Unit]
+Description=End-to-end health check for the PFDocs onion route
+Wants=pftdocs.service pftdocs-tor.service
+After=pftdocs.service pftdocs-tor.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/pfrpc/repos/pftdocs
+ExecStart=/usr/bin/npm run onion:recover
+TimeoutStartSec=60s

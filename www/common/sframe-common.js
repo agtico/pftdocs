@@ -329,6 +329,51 @@ define([
         });
     };
 
+    var taskNodeDocumentText = function () {
+        var raw = ctx.cpNfInner && ctx.cpNfInner.chainpad && ctx.cpNfInner.chainpad.getUserDoc();
+        var parsed;
+        try { parsed = JSON.parse(raw || 'null'); } catch (e) { return ''; }
+        var chunks = [];
+        var walk = function (node) {
+            if (chunks.join(' ').length >= 80000 || node === null || typeof(node) === 'undefined') { return; }
+            if (typeof(node) === 'string') {
+                var value = node.replace(/\s+/g, ' ').trim();
+                if (value) { chunks.push(value); }
+                return;
+            }
+            if (!Array.isArray(node)) { return; }
+            if (typeof(node[0]) === 'string' && Array.isArray(node[2])) {
+                node[2].forEach(walk);
+                if (/^(?:P|DIV|H[1-6]|LI|TR|BR)$/i.test(node[0])) { chunks.push('\n'); }
+                return;
+            }
+            node.forEach(walk);
+        };
+        walk(parsed);
+        return chunks.join(' ').replace(/\s*\n\s*/g, '\n').replace(/[ \t]+/g, ' ').trim().slice(0, 80000);
+    };
+
+    funcs.requestTaskNodeAssistant = function (data, cb) {
+        cb = cb || $.noop;
+        var md = ctx.metadataMgr.getMetadata();
+        var documentContent = typeof(data && data.documentContent) === 'string' ?
+            String(data.documentContent).trim().slice(0, 80000) : taskNodeDocumentText();
+        ctx.sframeChan.query('Q_TASKNODE_ASSISTANT_REQUEST', {
+            persona: String(data && data.persona || '').trim().toLowerCase().slice(0, 20),
+            prompt: String(data && data.prompt || '').trim().slice(0, 4000),
+            documentTitle: String(md.title || md.defaultTitle || '').trim().slice(0, 180),
+            documentContent: documentContent,
+            recentMessages: Array.isArray(data && data.recentMessages) ? data.recentMessages.slice(-12) : []
+        }, function (err, result) {
+            if (err) { return void cb(err); }
+            cb(null, result);
+        });
+    };
+    funcs.getTaskNodeDocumentText = taskNodeDocumentText;
+    funcs.requestTaskNodeOdv = function (data, cb) {
+        funcs.requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
+    };
+
     // Team Chat
     var teamChatChannel;
     funcs.setTeamChat = function (channel) {
@@ -492,6 +537,15 @@ define([
             // Otherwise, if we don't display the screen, it means it is not a deleted pad
             // so we can continue and start realtime...
             if (!funcs.isLoggedIn()) {
+                if (priv.taskNodeBootstrap) {
+                    c = $.extend({}, c, {
+                        // Force Cryptget.put before the creation callback. A blank
+                        // anonymous pad otherwise has no server-side channel until
+                        // the user makes their first edit, leaving a dead capability
+                        // if the creation window is closed immediately.
+                        templateContent: priv.app === 'sheet' ? {} : ['BODY', {}, [['P', {}, []]]]
+                    });
+                }
                 return void funcs.createPad(c, waitFor());
             }
             // If we display the pad creation screen, it will handle deleted pads directly
@@ -826,6 +880,58 @@ define([
             Language.applyTranslation();
 
             ctx.metadataMgr = MetadataMgr.create(ctx.sframeChan);
+
+            ctx.sframeChan.on('EV_TASKNODE_CONTEXT', function (data) {
+                data = data || {};
+                $('body').addClass('cp-tasknode-document');
+                var identity = data.identity || {};
+                var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
+                window.CryptPad_taskNodeContext = {
+                    channelHash: String(data.channelHash || ''),
+                    displayName: displayName,
+                    odv: data.odv || {}
+                };
+                var privateData = ctx.metadataMgr.getPrivateData();
+                var title = String(data.title || '').trim().slice(0, 180);
+                var current = ctx.metadataMgr.getMetadata();
+                var currentTitle = String(current.title || '').trim().slice(0, 180);
+                if (data.documentOwned === true && !privateData.readOnly) {
+                    if (currentTitle) {
+                        // Existing PFDocs titles may predate Task Node title-event
+                        // persistence. Re-publish the explicit encrypted title so
+                        // a stale library snapshot cannot overwrite it on reopen.
+                        ctx.sframeChan.query('Q_SET_PAD_TITLE_IN_DRIVE', {
+                            title: currentTitle,
+                            defaultTitle: current.defaultTitle
+                        }, $.noop);
+                    } else if (title && title !== current.defaultTitle) {
+                        // Task Node seeds documents that have never been named in
+                        // PFDocs; subsequent changes flow in both directions.
+                        ctx.metadataMgr.updateTitle(title);
+                    }
+                }
+                funcs.setAttribute(['toolbar', 'chat-drawer'], true);
+                $(window).trigger('tasknode:document-context');
+            });
+            ctx.sframeChan.on('EV_TASKNODE_COMMAND', function (data) {
+                if (String(data && data.command || '') === 'set-title') {
+                    var title = String(data && data.title || '').trim().slice(0, 180);
+                    var privateData = ctx.metadataMgr.getPrivateData();
+                    if (title && !privateData.readOnly) {
+                        ctx.metadataMgr.updateTitle(title);
+                    }
+                    return;
+                }
+                var selectors = {
+                    'export': '.cp-toolbar-icon-export',
+                    'history': '.cp-toolbar-icon-history',
+                    'chat-toggle': '#cp-toolbar-chat-drawer-open button'
+                };
+                var selector = selectors[String(data && data.command || '')];
+                if (!selector) { return; }
+                $(selector).first().trigger('click');
+            });
+            ctx.sframeChan.event('EV_TASKNODE_INNER_READY');
 
             ctx.sframeChan.whenReg('EV_CACHE_PUT', function () {
                 if (Object.keys(window.cryptpadCache.updated).length) {

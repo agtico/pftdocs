@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+FROM node:lts-alpine AS build
+
+WORKDIR /cryptpad
+COPY install-onlyoffice.sh ./
+RUN apk add --no-cache bash curl unzip \
+    && ./install-onlyoffice.sh --accept-license --no-rdfind
+COPY . .
+RUN npm install --production \
+    && npm run install:components \
+    && npm run postfiat:build-login-bundle \
+    && npm run postfiat:compress-static
+
+FROM node:lts-alpine
+RUN apk add --no-cache ca-certificates caddy curl su-exec
+RUN addgroup -S cryptpad -g 4001 && adduser -S cryptpad -G cryptpad --uid 4001 -h /cryptpad
+WORKDIR /cryptpad
+COPY --from=build --chown=cryptpad:cryptpad /cryptpad /cryptpad
+COPY --chown=root:root ops/fly-start.sh /usr/local/bin/pfdocs-fly-start
+RUN chmod 0755 /usr/local/bin/pfdocs-fly-start
+
+ENV PFDOCS_DATA_ROOT=/data
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/pfdocs-fly-start"]

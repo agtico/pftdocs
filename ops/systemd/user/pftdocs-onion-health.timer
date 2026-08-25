@@ -1,0 +1,11 @@
+[Unit]
+Description=Check and recover the PFDocs onion route every two minutes
+
+[Timer]
+OnActiveSec=1min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Unit=pftdocs-onion-health.service
+
+[Install]
+WantedBy=timers.target

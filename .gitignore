@@ -26,6 +26,9 @@ privileged.conf
 config/config.js
 config/sso.js
 .postfiat-onion/
+/artifacts/
+/config/config.js.bak-*
+/www/login/postfiat-login-bundle.js
 www/**/*.br
 www/**/*.gz
 lib/plugins/*

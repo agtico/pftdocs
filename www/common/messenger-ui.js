@@ -21,6 +21,40 @@ define([
     var MessengerUI = {};
 
     var mutedUsers = {};
+    // The messenger redraws a channel whenever a new encrypted message lands.
+    // Keep assistant work outside the rendered chat closure so a redraw cannot
+    // orphan an active request or discard mentions queued behind it.
+    var taskNodeAssistantStates = {};
+
+    var taskNodePersonaForMessage = function (value) {
+        var match = /(^|\s)@(ODV|coach)\b/i.exec(String(value || ''));
+        if (!match) { return; }
+        var persona = String(match[2] || '').toLowerCase();
+        return persona === 'coach' ? {
+            persona: 'coach', mention: '@coach', label: 'Trading Coach'
+        } : {
+            persona: 'odv', mention: '@ODV', label: 'ODV'
+        };
+    };
+
+    // Assistant replies are persisted in the encrypted chat with a mechanical
+    // routing header. Keep that metadata in the stored message, but do not
+    // render it as bold prose in the document-chat UI.
+    var taskNodeAssistantMessage = function (value) {
+        var text = String(value || '');
+        var match = /^\*\*@(ODV|coach) · (ODV|Trading Coach)(?: · GLM 5\.2 via Ambient)?\*\*\s*/i.exec(text);
+        if (!match) {
+            // Compatibility with the first Task Node ODV response format.
+            match = /^\*\*@ODV · GLM 5\.2 via Ambient\*\*\s*/i.exec(text);
+        }
+        if (!match) { return; }
+        var persona = /^coach$/i.test(match[1] || '') ? 'coach' : 'odv';
+        return {
+            body: text.slice(match[0].length).trim(),
+            label: persona === 'coach' ? 'Trading Coach' : 'ODV',
+            persona: persona
+        };
+    };
 
     var dataQuery = function (id) {
         return '[data-key="' + id + '"]';
@@ -204,16 +238,31 @@ define([
             var d = msg.time ? new Date(msg.time) : undefined;
             var day = d ? d.toLocaleDateString() : '';
             var hour = d ? d.toLocaleTimeString() : '';
+            var taskNodeDisplayName = String(window.CryptPad_taskNodeContext &&
+                window.CryptPad_taskNodeContext.displayName || '');
+            var classes = ['cp-app-contacts-message'];
+            if (taskNodeDisplayName && String(name || '') === taskNodeDisplayName) {
+                classes.push('cp-tasknode-chat-own');
+            }
+            var assistantMessage = taskNodeAssistantMessage(msg.text);
+            if (assistantMessage) {
+                classes.push('cp-tasknode-chat-assistant');
+                classes.push('cp-tasknode-chat-' + assistantMessage.persona);
+            }
+            var senderLabel = assistantMessage ? assistantMessage.label : name;
             return h('div.cp-app-contacts-message', {
+                class: classes.join(' '),
                 //title: time || '?',
-                'data-user': curvePublic || name,
-                'data-day': day
+                'data-user': assistantMessage ? 'tasknode-assistant-' + assistantMessage.persona :
+                    curvePublic || name,
+                'data-day': day,
+                'data-tasknode-persona': assistantMessage && assistantMessage.persona
             }, [
-                name? h('div.cp-app-contacts-sender', [
-                    h('span.cp-app-contacts-sender-name', name),
+                senderLabel ? h('div.cp-app-contacts-sender', [
+                    h('span.cp-app-contacts-sender-name', senderLabel),
                     h('span.cp-app-contacts-sender-time', day)
                 ]): undefined,
-                m(msg.text, hour),
+                m(assistantMessage ? assistantMessage.body : msg.text, hour),
             ]);
         };
 
@@ -335,9 +384,23 @@ define([
                 data.isFriendChat ? removeHistory : undefined
             ];
             if (isApp) {
+                var collapseTaskNodeChat = h('button.cp-tasknode-chat-collapse', {
+                    type: 'button',
+                    title: 'Collapse chat',
+                    'aria-label': 'Collapse chat'
+                }, Icons.get('shrink-pad'));
+                $(collapseTaskNodeChat).click(function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $('#cp-toolbar-chat-drawer-open button').first().trigger('click');
+                });
                 headerContent = [
-                    h('div.cp-app-contacts-header-title', Messages.contacts_padTitle),
-                    moreHistory
+                    h('div.cp-app-contacts-header-title', [
+                        Icons.get('sparkles'),
+                        h('span', Messages.contacts_padTitle)
+                    ]),
+                    moreHistory,
+                    collapseTaskNodeChat
                 ];
             }
             var header = h('div.cp-app-contacts-header', headerContent);
@@ -359,11 +422,21 @@ define([
 
             var messages = h('div.cp-app-contacts-messages');
             var input = h('textarea', {
-                placeholder: Messages.contacts_typeHere
+                placeholder: 'Ask about this doc…',
+                rows: 1
             });
-            var sendButton = h('button.btn.btn-primary', {
+            var sendButton = h('button.btn.btn-primary.cp-tasknode-chat-send.cp-tasknode-chat-send-idle', {
                 title: Messages.contacts_send,
-            }, Icons.get('send'));
+            }, Icons.get('arrow-up'));
+            var assistantStatus = h('p.cp-tasknode-chat-status', {
+                'aria-live': 'polite',
+                'data-tasknode-assistant-state': 'idle'
+            });
+            var taskNodeChatNote = h('p.cp-tasknode-chat-note',
+                'Chat can read this document. Billing is usage-based.');
+            $(input).on('input', function () {
+                $(sendButton).toggleClass('cp-tasknode-chat-send-idle', !String(input.value || '').trim());
+            });
 
             var rightCol = h('span.cp-app-contacts-right-col', [
                 h('span.cp-app-contacts-name', displayName),
@@ -384,6 +457,102 @@ define([
             }
 
             var sending = false;
+            var assistantState = taskNodeAssistantStates[id] || {
+                pending: false,
+                activeLabel: '',
+                queue: [],
+                statusNode: null
+            };
+            taskNodeAssistantStates[id] = assistantState;
+            assistantState.statusNode = assistantStatus;
+            var updateAssistantStatus = function () {
+                var $status = $(assistantState.statusNode);
+                if (!assistantState.pending) {
+                    return void $status
+                        .attr('data-tasknode-assistant-state', 'idle')
+                        .attr('data-tasknode-assistant-queued', '0')
+                        .text('');
+                }
+                var queued = assistantState.queue.length;
+                var text = (assistantState.activeLabel || 'Document assistant') + ' is thinking…';
+                if (queued) {
+                    text += ' · ' + queued + (queued === 1 ? ' mention queued' : ' mentions queued');
+                }
+                $status
+                    .attr('data-tasknode-assistant-state', 'pending')
+                    .attr('data-tasknode-assistant-queued', String(queued))
+                    .text(text);
+            };
+            var recentTaskNodeMessages = function (content) {
+                var liveChannel = state.channels[id] || {};
+                var messages = Array.isArray(liveChannel.messages) ? liveChannel.messages : [];
+                var recentMessages = messages.slice(-12).map(function (message) {
+                    return {
+                        author: String(message.name || contactsData[message.author] &&
+                            contactsData[message.author].displayName || 'member').slice(0, 120),
+                        text: String(message.text || '').slice(0, 2000)
+                    };
+                });
+                if (!recentMessages.length || recentMessages[recentMessages.length - 1].text !== content) {
+                    recentMessages.push({
+                        author: String(window.CryptPad_taskNodeContext &&
+                            window.CryptPad_taskNodeContext.displayName || 'member').slice(0, 120),
+                        text: String(content).slice(0, 2000)
+                    });
+                }
+                return recentMessages.slice(-12);
+            };
+            var runNextAssistant = function () {
+                if (assistantState.pending || !assistantState.queue.length) { return; }
+                var request = assistantState.queue.shift();
+                assistantState.pending = true;
+                assistantState.activeLabel = request.persona.label;
+                updateAssistantStatus();
+                common.requestTaskNodeAssistant({
+                    persona: request.persona.persona,
+                    prompt: request.content,
+                    documentContent: request.documentContent,
+                    recentMessages: request.recentMessages
+                }, function (assistantErr, result) {
+                    var finish = function () {
+                        assistantState.pending = false;
+                        assistantState.activeLabel = '';
+                        updateAssistantStatus();
+                        runNextAssistant();
+                    };
+                    if (assistantErr || !result || result.ok !== true || !result.response) {
+                        UI.warn(result && result.error || request.persona.mention +
+                            ' could not answer this request.');
+                        return void finish();
+                    }
+                    var responsePersona = result.persona === 'coach' ? {
+                        mention: '@coach', label: 'Trading Coach'
+                    } : { mention: '@ODV', label: 'ODV' };
+                    var response = '**' + responsePersona.mention + ' · ' + responsePersona.label +
+                        ' · GLM 5.2 via Ambient**\n\n' + String(result.response).slice(0, 12000);
+                    execCommand('SEND_MESSAGE', { id: id, content: response }, function (responseErr) {
+                        if (responseErr) {
+                            UI.warn(responsePersona.mention +
+                                ' answered, but the response could not be added to this encrypted chat.');
+                        } else {
+                            scrollChatToBottom();
+                        }
+                        finish();
+                    });
+                });
+            };
+            var queueAssistant = function (content, persona) {
+                assistantState.queue.push({
+                    content: content,
+                    persona: persona,
+                    documentContent: typeof(common.getTaskNodeDocumentText) === 'function' ?
+                        common.getTaskNodeDocumentText() : '',
+                    recentMessages: recentTaskNodeMessages(content)
+                });
+                updateAssistantStatus();
+                runNextAssistant();
+            };
+            updateAssistantStatus();
             var send = function (content) {
                 if (typeof(content) !== 'string' || !content.trim()) { return; }
                 if (sending) { return false; }
@@ -394,12 +563,20 @@ define([
                 }, function (e) {
                     if (e) {
                         // failed to send
+                        sending = false;
                         return void console.error('failed to send', e);
                     }
                     input.value = '';
+                    $(sendButton).addClass('cp-tasknode-chat-send-idle');
                     sending = false;
                     debug('sent successfully');
                     scrollChatToBottom();
+                    var persona = taskNodePersonaForMessage(content);
+                    var liveChannel = state.channels[id] || {};
+                    var isPadChat = Boolean(data.isPadChat || liveChannel.isPadChat);
+                    if (!isPadChat || !persona ||
+                            typeof(common.requestTaskNodeAssistant) !== 'function') { return; }
+                    queueAssistant(content, persona);
                 });
             };
 
@@ -442,8 +619,9 @@ define([
                 readOnly ? undefined : tips,
                 messages,
                 readOnly ? undefined : h('div.cp-app-contacts-input', [
-                    input,
-                    sendButton,
+                    h('div.cp-tasknode-chat-composer', [input, sendButton]),
+                    assistantStatus,
+                    taskNodeChatNote,
                 ]),
             ]);
         };

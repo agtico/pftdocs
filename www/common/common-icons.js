@@ -13,6 +13,7 @@ define([
         "homepage": "house",
         "drive": "hard-drive",
         "search": "search",
+        "sparkles": "sparkles",
         "drive-shared-folder": "folder-users",
         "drive-upload-file": "file-up",
         "drive-upload-folder": "folder-up",
@@ -299,4 +300,3 @@ define([
 
     return Icons;
 });
-

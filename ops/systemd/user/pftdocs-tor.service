@@ -1,0 +1,15 @@
+[Unit]
+Description=Tor onion service for PFDocs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pfrpc/repos/pftdocs
+ExecStart=/home/pfrpc/repos/pftdocs/scripts/postfiat-onion-dev.sh tor-service
+Restart=always
+RestartSec=5s
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=default.target

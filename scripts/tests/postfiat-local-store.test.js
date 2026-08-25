@@ -14,6 +14,10 @@ const localStoreSource = fs.readFileSync(
     path.join(repoRoot, 'www/common/outer/local-store.js'),
     'utf8'
 );
+const logoutSource = fs.readFileSync(
+    path.join(repoRoot, 'www/logout/main.js'),
+    'utf8'
+);
 
 const makeStorage = () => ({
     setItem(key, value) {
@@ -78,6 +82,48 @@ const loadLocalStore = () => {
     return { LocalStore, localStorage, sessionStorage, window: context.window, events };
 };
 
+const loadLogoutPage = (localStorage) => {
+    const events = {
+        cacheClears: 0,
+        localForageClears: 0,
+    };
+    const window = { location: { href: '/logout/' } };
+    const context = {
+        console,
+        localStorage,
+        window,
+        define(_deps, factory) {
+            factory(
+                {
+                    clear(cb) {
+                        events.localForageClears++;
+                        if (cb) { cb(); }
+                    },
+                },
+                {
+                    clear(cb) {
+                        events.cacheClears++;
+                        if (cb) { cb(); }
+                    },
+                },
+                (fn) => {
+                    const chain = {
+                        nThen(next) {
+                            next();
+                            return chain;
+                        },
+                    };
+                    fn(() => () => {});
+                    return chain;
+                }
+            );
+        },
+    };
+    vm.createContext(context);
+    vm.runInContext(logoutSource, context);
+    return { events, window };
+};
+
 test('password logins keep CryptPad persistent local storage behavior', () => {
     const { LocalStore, localStorage, sessionStorage } = loadLocalStore();
 
@@ -125,8 +171,14 @@ test('wallet switching clears wallet-scoped caches but preserves browser provide
     localStorage.PFT_ai_provider_settings_v1 = '{"provider":"ambient"}';
     localStorage.PFT_runpod_api_key_v1 = '{"key":"rp"}';
     localStorage.PFT_runpod_settings_v1 = '{"podName":"qwen"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'] = '{"openrouter":"or"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_provider_settings_v1'] = '{"provider":"openrouter"}';
+    localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'] = '{"key":"rp-bridge"}';
+    localStorage['CRYPTPAD_STORE|PFT_runpod_settings_v1'] = '{"podName":"qwen-bridge"}';
     localStorage.PFT_ai_chat_sessions_v1 = '[{"id":"old-chat"}]';
+    localStorage['CRYPTPAD_STORE|PFT_ai_chat_sessions_v1'] = '[{"id":"old-bridge-chat"}]';
     localStorage['PFT_tasknode_ipfs_json_v1:cid'] = '{"payload":"old"}';
+    localStorage['CRYPTPAD_STORE|PFT_tasknode_ipfs_json_v1:cid'] = '{"payload":"old-bridge"}';
 
     LocalStore.walletLogin(undefined, 'new-wallet-block', 'rKxpJQ6hLWYbo7p1oo7WHjrcrRFv1TUQeC');
 
@@ -136,8 +188,20 @@ test('wallet switching clears wallet-scoped caches but preserves browser provide
     assert.equal(localStorage.PFT_ai_provider_settings_v1, '{"provider":"ambient"}');
     assert.equal(localStorage.PFT_runpod_api_key_v1, '{"key":"rp"}');
     assert.equal(localStorage.PFT_runpod_settings_v1, '{"podName":"qwen"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'], '{"openrouter":"or"}');
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_provider_settings_v1'],
+        '{"provider":"openrouter"}'
+    );
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'], '{"key":"rp-bridge"}');
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_runpod_settings_v1'],
+        '{"podName":"qwen-bridge"}'
+    );
     assert.equal(localStorage.PFT_ai_chat_sessions_v1, undefined);
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_ai_chat_sessions_v1'], undefined);
     assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:cid'], undefined);
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_tasknode_ipfs_json_v1:cid'], undefined);
     assert.equal(sessionStorage[Constants.blockHashKey], 'new-wallet-block');
     assert.equal(events.localForageClears, 1);
     assert.equal(events.cacheClears, 1);
@@ -268,8 +332,17 @@ test('logout preserves Post Fiat browser-local app secrets and cache', () => {
     localStorage.PFT_runpod_settings_v1 = '{"podName":"qwen"}';
     localStorage.PFT_ai_chat_sessions_v1 = '[{"id":"chat"}]';
     localStorage.PFT_ai_chat_options_v1 = '{"includeTasks":true}';
+    localStorage.PFT_nostr_peer_messages_v1 = '{"peer":"message"}';
     localStorage['PFT_tasknode_ipfs_json_v1:index'] = '[{"cid":"bafy"}]';
     localStorage['PFT_tasknode_ipfs_json_v1:bafy'] = '{"payload":"encrypted"}';
+    localStorage['PFT_ai_chat_memory_v1:chat'] = '{"summary":"keep"}';
+    localStorage['PFT_ai_chat_context_pack_v1:chat'] = '{"context":"keep"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'] = '{"ambient":"amb-bridge"}';
+    localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'] = '{"key":"rp-bridge"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_chat_memory_v1:chat'] = '{"summary":"keep-bridge"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_chat_context_pack_v1:chat'] = '{"context":"keep-bridge"}';
+    localStorage['CRYPTPAD_STORE|PFT_session_wallet'] = '{"address":"session-only"}';
+    localStorage['CRYPTPAD_STORE|colortheme'] = '"dark"';
     localStorage.unrelated = 'remove-me';
     sessionStorage.PFT_wallet_session = '1';
 
@@ -282,8 +355,63 @@ test('logout preserves Post Fiat browser-local app secrets and cache', () => {
     assert.equal(localStorage.PFT_runpod_settings_v1, '{"podName":"qwen"}');
     assert.equal(localStorage.PFT_ai_chat_sessions_v1, '[{"id":"chat"}]');
     assert.equal(localStorage.PFT_ai_chat_options_v1, '{"includeTasks":true}');
+    assert.equal(localStorage.PFT_nostr_peer_messages_v1, '{"peer":"message"}');
     assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:index'], '[{"cid":"bafy"}]');
     assert.equal(localStorage['PFT_tasknode_ipfs_json_v1:bafy'], '{"payload":"encrypted"}');
+    assert.equal(localStorage['PFT_ai_chat_memory_v1:chat'], '{"summary":"keep"}');
+    assert.equal(localStorage['PFT_ai_chat_context_pack_v1:chat'], '{"context":"keep"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'], '{"ambient":"amb-bridge"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'], '{"key":"rp-bridge"}');
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_chat_memory_v1:chat'],
+        '{"summary":"keep-bridge"}'
+    );
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_chat_context_pack_v1:chat'],
+        '{"context":"keep-bridge"}'
+    );
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_session_wallet'], undefined);
+    assert.equal(localStorage['CRYPTPAD_STORE|colortheme'], '"dark"');
     assert.equal(localStorage.unrelated, undefined);
     assert.equal(sessionStorage.PFT_wallet_session, undefined);
+});
+
+test('/logout preserves Post Fiat browser-local secrets stored through the frame bridge', () => {
+    const localStorage = makeStorage();
+
+    localStorage.PFT_ai_provider_settings_v1 = '{"provider":"ambient"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'] = '{"ambient":"amb"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_provider_settings_v1'] = '{"provider":"openrouter"}';
+    localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'] = '{"key":"rp"}';
+    localStorage['CRYPTPAD_STORE|PFT_runpod_settings_v1'] = '{"podName":"qwen"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_chat_memory_v1:chat'] = '{"summary":"keep"}';
+    localStorage['CRYPTPAD_STORE|PFT_ai_chat_context_pack_v1:chat'] = '{"context":"keep"}';
+    localStorage['CRYPTPAD_STORE|PFT_nostr_peer_messages_v1'] = '{"peer":"message"}';
+    localStorage['CRYPTPAD_STORE|PFT_session_wallet'] = '{"address":"session-only"}';
+    localStorage.unrelated = 'remove-me';
+
+    const { events, window } = loadLogoutPage(localStorage);
+
+    assert.equal(localStorage.PFT_ai_provider_settings_v1, '{"provider":"ambient"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_ai_provider_keys_v1'], '{"ambient":"amb"}');
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_provider_settings_v1'],
+        '{"provider":"openrouter"}'
+    );
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_runpod_api_key_v1'], '{"key":"rp"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_runpod_settings_v1'], '{"podName":"qwen"}');
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_chat_memory_v1:chat'],
+        '{"summary":"keep"}'
+    );
+    assert.equal(
+        localStorage['CRYPTPAD_STORE|PFT_ai_chat_context_pack_v1:chat'],
+        '{"context":"keep"}'
+    );
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_nostr_peer_messages_v1'], '{"peer":"message"}');
+    assert.equal(localStorage['CRYPTPAD_STORE|PFT_session_wallet'], undefined);
+    assert.equal(localStorage.unrelated, undefined);
+    assert.equal(events.localForageClears, 1);
+    assert.equal(events.cacheClears, 1);
+    assert.equal(window.location.href, '/login/');
 });

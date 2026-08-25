@@ -49,3 +49,12 @@ test('Post Fiat app CSP allows wallet decryption WebAssembly', () => {
     assert.doesNotMatch(csp, /script-src[^;]+'unsafe-eval'/u);
     assert.doesNotMatch(csp, /script-src[^;]+'unsafe-inline'/u);
 });
+
+test('wallet login and registration routes use the Post Fiat WebAssembly CSP', () => {
+    const worker = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '../../lib/http-worker.js'),
+        'utf8'
+    );
+
+    assert.match(worker, /\(\?:app\|login\|register\)/u);
+});

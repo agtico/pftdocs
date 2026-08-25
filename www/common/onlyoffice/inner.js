@@ -3494,9 +3494,17 @@ Uncaught TypeError: Cannot read property 'calculatedType' of null
         };
 
         var firstReady = true;
+        var taskNodeCapabilityInitialized = false;
         config.onReady = function (info) {
             if (APP.realtime !== info.realtime) {
                 APP.realtime = info.realtime;
+            }
+
+            if (privateData.taskNodeBootstrap && !readOnly && !taskNodeCapabilityInitialized) {
+                taskNodeCapabilityInitialized = true;
+                sframeChan.event('EV_TASKNODE_PAD_INITIALIZED', {
+                    requestId: privateData.taskNodeBootstrap
+                });
             }
 
             var userDoc = APP.realtime.getUserDoc();
