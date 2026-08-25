@@ -1399,7 +1399,7 @@ define([
                         feedbackAllowed: Utils.Feedback.state,
                         prefersDriveRedirect: Utils.LocalStore.getDriveRedirectPreference(),
                         isPresent: parsed.hashData && parsed.hashData.present,
-                        isEmbed: parsed.hashData && parsed.hashData.embed || cfg.integration,
+                        isEmbed: parsed.hashData && parsed.hashData.embed || cfg.integration || Boolean(taskNodeSession),
                         isTop: window.top === window,
                         canEdit: Boolean(hashes && hashes.editHash),
                         oldVersionHash: parsed.hashData && parsed.hashData.version < 2, // password
@@ -1418,6 +1418,7 @@ define([
                         }) : undefined,
                         fromContent: Cryptpad.fromContent,
                         taskNodeBootstrap: Cryptpad.taskNodeBootstrap,
+                        taskNodeSession: taskNodeSession,
                         burnAfterReading: burnAfterReading,
                         storeInTeam: Cryptpad.initialTeam || (Cryptpad.initialPath ? -1 : undefined),
                         supportsWasm: Utils.Util.supportsWasm(),

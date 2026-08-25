@@ -2022,6 +2022,10 @@ define([
                         '#file-menu-panel .devider { display: none !important; }' + // separator in the "File" menu
                         '#left-btn-spellcheck, #left-btn-about { display: none !important; }'+
                         'div.btn-users.dropdown-toggle { display: none; !important }';
+            if (privateData.taskNodeSession) {
+                css += '#toolbar .box-tabs .extra.left, #toolbar .box-tabs .extra.right, #left-menu, #right-menu { display: none !important; }' +
+                    '#toolbar .box-tabs { background: #fff !important; border-bottom: 1px solid #e7e5e4 !important; }';
+            }
             if (readOnly) {
                 css += '#toolbar { display: none !important; }';
                 //css += '#app-title { display: none !important; }'; // OnlyOffice logo + doc title
@@ -2232,6 +2236,7 @@ define([
             //let ec = integrationConfig?.editorConfig;
             let dc = integrationConfig?.document;
 
+            const isTaskNodeSheet = privateData.app === 'sheet' && Boolean(privateData.taskNodeSession);
             const ooconfig = {
                 document: {
                     fileType: file.type,
@@ -2247,13 +2252,23 @@ define([
                 "documentType": file.doc,
                 "editorConfig": {
                     customization: {
+                        anonymous: isTaskNodeSheet ? { request: false, label: Messages.anonymous } : undefined,
                         compactHeader: true,
+                        compactToolbar: isTaskNodeSheet,
                         chat: false,
+                        feedback: false,
+                        features: isTaskNodeSheet ? {
+                            featuresTips: false,
+                            tabBackground: { mode: "toolbar", change: false },
+                            tabStyle: { mode: "line", change: false }
+                        } : undefined,
+                        help: !isTaskNodeSheet,
                         logo: {
                             url: "/bounce/#" + encodeURIComponent('https://www.onlyoffice.com')
                         },
                         comments: !lock && !readOnly,
                         hideRightMenu: true,
+                        toolbarHideFileName: isTaskNodeSheet,
                         uiTheme: window.CryptPad_theme === "dark" ? "theme-dark" : "theme-classic-light"
                     },
                     "user": {

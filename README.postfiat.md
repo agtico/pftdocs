@@ -15,7 +15,9 @@ PFDOCS_TASKNODE_ORIGINS=https://tasknode.postfiat.org
 The bridge rejects wildcard and non-HTTP origins, sends edit/view capabilities
 only to the exact opener origin, and then redirects the popup into the new pad.
 The product surface exposes only the internal drive dependency, rich-text pad,
-and spreadsheet apps. Abandoned data is eligible for eviction after 180 inactive days,
+and spreadsheet apps. Task Node owns the document header while PFDocs supplies a
+compact embedded editing surface without duplicate account, sharing, or chat chrome.
+Abandoned data is eligible for eviction after 180 inactive days,
 archived blocks are retained for 30 days, and individual uploads are capped at
 20 MiB.
 

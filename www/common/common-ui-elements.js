@@ -3442,6 +3442,10 @@ define([
         }
         var priv = common.getMetadataMgr().getPrivateData();
 
+        // Task Node owns the encrypted document library. Asking users to also
+        // store the same capability in CryptDrive is both redundant and false.
+        if (priv.taskNodeSession) { return; }
+
         // This pad will be deleted automatically, it shouldn't be stored
         if (priv.burnAfterReading) { return; }
         if (priv.app === 'form' && !priv.canEdit && !priv.form_auditorKey && !common.isLoggedIn()) { return; }

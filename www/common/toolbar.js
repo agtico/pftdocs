@@ -619,7 +619,7 @@ MessengerUI, Messages, Pages, Icons) {
             Common.setAttribute(['toolbar', 'chat-drawer'], visible);
         });
         $(window).on('tasknode:document-context', function () {
-            show();
+            if (config.metadataMgr.getPrivateData().app !== 'sheet') { show(); }
         });
         show();
         Common.getAttribute(['toolbar', 'chat-drawer'], function (err, val) {

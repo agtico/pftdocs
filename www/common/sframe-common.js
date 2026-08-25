@@ -910,8 +910,10 @@ define([
                         ctx.metadataMgr.updateTitle(title);
                     }
                 }
-                funcs.setAttribute(['toolbar', 'chat-drawer'], true);
-                $(window).trigger('tasknode:document-context');
+                if (privateData.app !== 'sheet') {
+                    funcs.setAttribute(['toolbar', 'chat-drawer'], true);
+                    $(window).trigger('tasknode:document-context');
+                }
             });
             ctx.sframeChan.on('EV_TASKNODE_COMMAND', function (data) {
                 if (String(data && data.command || '') === 'set-title') {
