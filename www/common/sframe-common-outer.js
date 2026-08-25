@@ -110,6 +110,21 @@ define([
     common.start = function (cfg) {
         cfg = cfg || {};
         var realtime = !cfg.noRealtime;
+        // Capture bridge metadata before CryptPad canonicalizes the editor URL
+        // to its capability hash and drops the query string.
+        var taskNodeBootstrap;
+        var taskNodeSession;
+        try {
+            var taskNodeUrl = new URL(window.location.href);
+            var requestedTaskNodeBootstrap = taskNodeUrl.searchParams.get('tasknodeBootstrap');
+            var requestedTaskNodeSession = taskNodeUrl.searchParams.get('tasknodeSession');
+            if (/^[0-9a-f-]{36}$/i.test(requestedTaskNodeBootstrap || '')) {
+                taskNodeBootstrap = requestedTaskNodeBootstrap;
+            }
+            if (/^[0-9a-f-]{36}$/i.test(requestedTaskNodeSession || '')) {
+                taskNodeSession = requestedTaskNodeSession;
+            }
+        } catch (e) { console.error(e); }
         var secret;
         var hashes;
         var isNewFile;
@@ -119,6 +134,10 @@ define([
         var Cryptget;
         var SFrameChannel;
         var sframeChan;
+        // Initialized when the validated Task Node bridge is available. The
+        // title handler runs in a later nThen phase, so this publisher must
+        // live in the shared editor-start scope rather than one phase callback.
+        var publishTaskNodeTitle = function () {};
         var SecureIframe;
         var UnsafeIframe;
         var OOIframe;
@@ -761,6 +780,204 @@ define([
             var parsed = Utils.Hash.parsePadUrl(currentPad.href);
             burnAfterReading = parsed && parsed.hashData && parsed.hashData.ownerKey;
 
+            if (taskNodeBootstrap) {
+                Cryptpad.taskNodeBootstrap = taskNodeBootstrap;
+            }
+
+            var taskNodeBridge;
+            if (taskNodeSession) {
+                try {
+                    var storedTaskNodeBridge = JSON.parse(sessionStorage.getItem('PFDocs_taskNodeBridge') || 'null');
+                    var taskNodeOrigins = ApiConfig.postFiat && ApiConfig.postFiat.taskNodeOrigins || [];
+                    if (storedTaskNodeBridge &&
+                            storedTaskNodeBridge.requestId === taskNodeSession &&
+                            taskNodeOrigins.indexOf(storedTaskNodeBridge.returnOrigin) !== -1) {
+                        taskNodeBridge = storedTaskNodeBridge;
+                    }
+                } catch (e) { console.error(e); }
+            }
+
+            var taskNodeTarget = function () {
+                if (!taskNodeBridge) { return; }
+                if (taskNodeBridge.targetMode === 'parent' && window.parent !== window) {
+                    return window.parent;
+                }
+                if (taskNodeBridge.targetMode === 'opener' && window.opener && !window.opener.closed) {
+                    return window.opener;
+                }
+            };
+
+            var taskNodeCapabilityPublished = false;
+            var taskNodeContextAccepted = false;
+            var taskNodeAssistantsEnabled = false;
+            var pendingTaskNodeAssistants = {};
+            var publishTaskNodeCapability = function (data) {
+                if (taskNodeCapabilityPublished || !taskNodeBridge || taskNodeBridge.action !== 'create' || !data ||
+                        data.requestId !== taskNodeBridge.requestId) { return; }
+                try {
+                    var capabilityParsed = Utils.Hash.parsePadUrl(currentPad.href);
+                    var documentType = taskNodeBridge.documentType === 'sheet' ? 'sheet' : 'pad';
+                    var editHash = capabilityParsed && capabilityParsed.hash;
+                    var viewHash = Utils.Hash.getViewHashFromKeys(secret);
+                    var target = taskNodeTarget();
+                    if (!capabilityParsed || capabilityParsed.type !== documentType ||
+                            !secret.channel || !editHash || !viewHash ||
+                            !target) {
+                        throw new Error('PFDocs could not publish the initialized document capability.');
+                    }
+                    target.postMessage({
+                        type: 'pfdocs.tasknode.document-created',
+                        requestId: taskNodeBridge.requestId,
+                        channelHash: secret.channel,
+                        editHref: '/' + documentType + '/#' + editHash,
+                        viewHref: '/' + documentType + '/#' + viewHash
+                    }, taskNodeBridge.returnOrigin);
+                    taskNodeCapabilityPublished = true;
+                } catch (e) { console.error(e); }
+            };
+
+            publishTaskNodeTitle = function (title) {
+                var target = taskNodeTarget();
+                var normalizedTitle = String(title || '').trim().slice(0, 180);
+                if (!target || !secret.channel || !normalizedTitle) { return; }
+                target.postMessage({
+                    type: 'pfdocs.tasknode.document-title',
+                    channelHash: secret.channel,
+                    title: normalizedTitle
+                }, taskNodeBridge.returnOrigin);
+            };
+
+            var onTaskNodeMessage = function (event) {
+                var target = taskNodeTarget();
+                var data = event && event.data || {};
+                if (!target || event.source !== target || event.origin !== taskNodeBridge.returnOrigin) { return; }
+                if (data.requestId !== taskNodeBridge.requestId || data.channelHash !== secret.channel) { return; }
+                if (data.type === 'tasknode.pfdocs.context') {
+                    taskNodeContextAccepted = true;
+                    taskNodeAssistantsEnabled = Boolean(data.odv && data.odv.enabled === true ||
+                        Array.isArray(data.agents) && data.agents.length);
+                    var identity = data.identity || {};
+                    var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
+                    if (displayName) {
+                        Cryptpad.setDisplayName(displayName, function (err) {
+                            if (!err) { Cryptpad.changeMetadata(); }
+                        });
+                    }
+                    sframeChan.event('EV_TASKNODE_CONTEXT', {
+                        channelHash: secret.channel,
+                        title: String(data.title || '').trim().slice(0, 180),
+                        documentOwned: data.documentOwned === true,
+                        identity: identity,
+                        odv: data.odv || {},
+                        agents: Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
+                    });
+                    return;
+                }
+                if (data.type === 'tasknode.pfdocs.command') {
+                    if (!taskNodeContextAccepted) { return; }
+                    var command = String(data.command || '');
+                    if (['import-content', 'export', 'history', 'chat-toggle', 'set-title'].indexOf(command) === -1) { return; }
+                    var commandData = { command: command };
+                    if (command === 'set-title') {
+                        commandData.title = String(data.title || '').trim().slice(0, 180);
+                        if (!commandData.title) { return; }
+                    }
+                    if (command === 'import-content') {
+                        var importFile = data.file || {};
+                        commandData.file = {
+                            name: String(importFile.name || '').trim().slice(0, 180),
+                            mimeType: String(importFile.mimeType || 'text/plain').trim().slice(0, 120),
+                            content: String(importFile.content || '').slice(0, 8 * 1024 * 1024)
+                        };
+                        if (!commandData.file.name || !commandData.file.content) { return; }
+                    }
+                    sframeChan.event('EV_TASKNODE_COMMAND', commandData);
+                    return;
+                }
+                if (['tasknode.pfdocs.assistant-response', 'tasknode.pfdocs.odv-response'].indexOf(data.type) === -1) { return; }
+                var assistantRequestId = data.assistantRequestId || data.odvRequestId;
+                var pending = pendingTaskNodeAssistants[assistantRequestId];
+                if (!pending) { return; }
+                delete pendingTaskNodeAssistants[assistantRequestId];
+                clearTimeout(pending.timeout);
+                pending.cb({
+                    ok: data.ok === true,
+                    response: String(data.response || '').slice(0, 12000),
+                    persona: String(data.persona || pending.persona || 'odv').slice(0, 20),
+                    label: String(data.label || pending.label || 'ODV').slice(0, 80),
+                    model: String(data.model || 'z-ai/glm-5.2').slice(0, 160),
+                    error: String(data.error || '').slice(0, 500)
+                });
+            };
+
+            if (taskNodeBridge) {
+                window.addEventListener('message', onTaskNodeMessage);
+                var requestTaskNodeAssistant = function (data, cb) {
+                    var target = taskNodeTarget();
+                    var persona = String(data && data.persona || '').trim().toLowerCase();
+                    var prompt = String(data && data.prompt || '').trim().slice(0, 4000);
+                    var documentContent = String(data && data.documentContent || '').trim().slice(0, 80000);
+                    var mentionMatches = persona === 'odv' ? /(^|\s)@ODV\b/i.test(prompt) :
+                        persona === 'coach' && /(^|\s)@coach\b/i.test(prompt);
+                    if (!taskNodeContextAccepted || !taskNodeAssistantsEnabled || !target || !mentionMatches || !documentContent) {
+                        return void cb({ ok: false, error: 'The mentioned Task Node assistant is unavailable.' });
+                    }
+                    var assistantRequestId = Utils.Util.uid();
+                    var label = persona === 'coach' ? 'Trading Coach' : 'ODV';
+                    var timeout = setTimeout(function () {
+                        var pending = pendingTaskNodeAssistants[assistantRequestId];
+                        if (!pending) { return; }
+                        delete pendingTaskNodeAssistants[assistantRequestId];
+                        pending.cb({ ok: false, error: '@' + persona + ' timed out.' });
+                    }, 65000);
+                    pendingTaskNodeAssistants[assistantRequestId] = {
+                        cb: cb, timeout: timeout, persona: persona, label: label
+                    };
+                    target.postMessage({
+                        type: 'pfdocs.tasknode.assistant-request',
+                        requestId: taskNodeBridge.requestId,
+                        assistantRequestId: assistantRequestId,
+                        channelHash: secret.channel,
+                        persona: persona,
+                        prompt: prompt,
+                        documentTitle: String(data.documentTitle || '').trim().slice(0, 180),
+                        documentContent: documentContent,
+                        recentMessages: Array.isArray(data.recentMessages) ? data.recentMessages.slice(-12) : []
+                    }, taskNodeBridge.returnOrigin);
+                };
+                sframeChan.on('Q_TASKNODE_ASSISTANT_REQUEST', requestTaskNodeAssistant);
+                sframeChan.on('Q_TASKNODE_ODV_REQUEST', function (data, cb) {
+                    requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
+                });
+                sframeChan.on('EV_TASKNODE_IMPORT_RESULT', function (data) {
+                    var importTarget = taskNodeTarget();
+                    if (!importTarget || !secret.channel) { return; }
+                    importTarget.postMessage({
+                        type: 'pfdocs.tasknode.import-result',
+                        requestId: taskNodeBridge.requestId,
+                        channelHash: secret.channel,
+                        ok: data && data.ok === true,
+                        fileName: String(data && data.fileName || '').slice(0, 180),
+                        error: String(data && data.error || '').slice(0, 500)
+                    }, taskNodeBridge.returnOrigin);
+                });
+                sframeChan.on('EV_TASKNODE_INNER_READY', function () {
+                    var readyTarget = taskNodeTarget();
+                    if (!readyTarget || !secret.channel) { return; }
+                    readyTarget.postMessage({
+                        type: 'pfdocs.tasknode.ready',
+                        requestId: taskNodeBridge.requestId,
+                        channelHash: secret.channel
+                    }, taskNodeBridge.returnOrigin);
+                });
+            }
+
+            // This handler belongs to the outer frame because it is the only
+            // frame that can safely validate the Task Node opener and mint the
+            // edit/view capabilities. Register it here, in the same bootstrap
+            // scope, before realtime startup can emit the initialized event.
+            sframeChan.on('EV_TASKNODE_PAD_INITIALIZED', publishTaskNodeCapability);
+
             currentPad.app = parsed.type;
 
             // Allow "debug" to show drive content if no hash is provided
@@ -1199,6 +1416,7 @@ define([
                             title: Cryptpad.fromFileData.title
                         }) : undefined,
                         fromContent: Cryptpad.fromContent,
+                        taskNodeBootstrap: Cryptpad.taskNodeBootstrap,
                         burnAfterReading: burnAfterReading,
                         storeInTeam: Cryptpad.initialTeam || (Cryptpad.initialPath ? -1 : undefined),
                         supportsWasm: Utils.Util.supportsWasm(),
@@ -1836,13 +2054,20 @@ define([
                 var newTitle = newData.title || newData.defaultTitle;
                 currentTitle = newTitle;
                 setDocumentTitle();
+                // Task Node owns its wallet-encrypted library metadata. Keep
+                // that title in sync as soon as the trusted editor accepts the
+                // rename; anonymous pads may not have a drive callback to wait
+                // for even though their encrypted document metadata is saved.
+                publishTaskNodeTitle(newTitle);
                 var data = {
                     password: password,
                     title: newTitle,
                     channel: secret.channel,
                     path: initialPathInDrive // Where to store the pad if we don't have it in our drive
                 };
-                setPadTitle(data, cb);
+                setPadTitle(data, function (result) {
+                    cb(result);
+                });
             });
             sframeChan.on('EV_SET_TAB_TITLE', function (newTabTitle) {
                 currentTabTitle = newTabTitle;

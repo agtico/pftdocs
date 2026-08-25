@@ -324,6 +324,570 @@ body.cp-app-pad {
         }
     }
 
+    // Task Node owns the surrounding navigation, identity, document title, and
+    // sharing chrome. Keep CryptPad's encrypted editor/runtime, but present it
+    // as a focused Task Node document surface instead of a nested legacy app.
+    &.cp-tasknode-document {
+        color: #1c1917;
+        background: #fff;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+        #cp-app-pad-toolbar,
+        .cp-help-container,
+        .cp-corner-container,
+        #cp-app-pad-toc,
+        #cp-app-pad-resize,
+        #cp-app-pad-comments,
+        .cke_toolbox_collapser,
+        .cke_button__comment {
+            display: none !important;
+        }
+
+        #cp-app-pad-editor {
+            min-height: 0;
+            background: #fff;
+        }
+
+        #cke_editor1 {
+            background: #fff;
+
+            > .cke_inner {
+                margin: 0;
+            }
+        }
+
+        .cke_toolbox_main {
+            box-sizing: border-box;
+            min-height: 46px;
+            position: relative;
+            display: block !important;
+            overflow: visible;
+            padding: 6px 10px;
+            border-bottom: 1px solid #edebe9;
+            background: #fcfcfb;
+            color: #57534e;
+
+            .cp-tasknode-formatbar {
+                position: relative;
+                display: flex;
+                min-width: 0;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .cp-tasknode-formatbar-primary {
+                display: flex;
+                min-width: 0;
+                flex: 1;
+                align-items: center;
+                gap: 2px;
+                overflow: hidden;
+            }
+
+            .cp-tasknode-formatbar-more {
+                display: inline-flex;
+                width: 34px;
+                height: 32px;
+                flex: 0 0 34px;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid #e7e5e4;
+                border-radius: 8px;
+                background: #fff;
+                color: #57534e;
+                font: 700 18px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+                cursor: pointer;
+
+                &:hover,
+                &[aria-expanded="true"] {
+                    border-color: #d6d3d1;
+                    background: #f5f5f4;
+                }
+            }
+
+            .cp-tasknode-formatbar-overflow {
+                display: none;
+                position: absolute;
+                z-index: 20;
+                top: 39px;
+                right: 0;
+                width: 360px;
+                max-width: 92vw;
+                max-height: 260px;
+                overflow-x: hidden;
+                overflow-y: auto;
+                border: 1px solid #e7e5e4;
+                border-radius: 12px;
+                background: #fff;
+                padding: 8px;
+                box-shadow: 0 18px 48px rgba(28, 25, 23, .16);
+
+                .cke_toolbar {
+                    width: 100%;
+                    height: auto;
+                    min-height: 32px;
+                    flex-wrap: wrap;
+                    border-bottom: 1px solid #f0efed;
+                    padding: 5px 0;
+
+                    &:last-child { border-bottom: 0; }
+                }
+            }
+
+            .cp-tasknode-formatbar-open .cp-tasknode-formatbar-overflow {
+                display: block;
+            }
+
+            .cke_toolbar {
+                height: 32px;
+                flex: 0 0 auto;
+                align-items: center;
+                padding: 0;
+            }
+
+            .cke_toolbar_separator {
+                height: 20px;
+                margin: 6px 5px;
+                border-color: #e7e5e4;
+            }
+
+            .cke_toolgroup {
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+
+            .cke_combo {
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+
+            .cke_button,
+            .cke_combo_button {
+                min-height: 30px;
+                box-sizing: border-box;
+                border: 0;
+                border-radius: 8px;
+                background: transparent;
+
+                &.cke_button_on,
+                &.cke_combo_button:hover,
+                &.cke_button_off:hover {
+                    border-color: transparent;
+                    background: #f5f5f4;
+                }
+            }
+
+            .cke_combo_text {
+                color: #57534e;
+                font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+                font-size: 12px;
+            }
+
+            .cke_button_icon {
+                opacity: .78;
+                filter: grayscale(1) contrast(1.4);
+            }
+        }
+
+        .cp-tasknode-editor-status {
+            box-sizing: border-box;
+            min-height: 31px;
+            flex: 0 0 31px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border-top: 1px solid #edebe9;
+            background: #fcfcfb;
+            padding: 5px 12px;
+            color: #78716c;
+            font: 11px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+
+            .cp-tasknode-status-encryption,
+            .cp-tasknode-status-details,
+            .cp-tasknode-status-history {
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .cp-tasknode-status-encryption { gap: 6px; }
+            .cp-tasknode-status-details { gap: 14px; }
+            .cp-tasknode-status-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #17b26a;
+            }
+            .cp-app-pad-wordCount {
+                height: auto;
+                padding: 0;
+                white-space: nowrap;
+                color: #78716c;
+            }
+            .cp-tasknode-status-history {
+                gap: 5px;
+                border: 0;
+                background: transparent;
+                padding: 2px 4px;
+                color: #57534e;
+                font: inherit;
+                cursor: pointer;
+
+                &:hover { color: #1c1917; }
+                svg {
+                    width: 12px;
+                    height: 12px;
+                    margin: 0;
+                }
+            }
+        }
+
+        #cke_1_contents {
+            min-width: 0;
+            background: #fff;
+
+            &.cke_body_width iframe,
+            iframe {
+                width: 100%;
+                max-width: 860px;
+                margin: 0 auto;
+                background: #fff;
+            }
+        }
+
+        .cp-toolbar-chat-drawer {
+            box-sizing: border-box;
+            width: 340px;
+            min-width: 340px;
+            flex: 0 0 340px;
+            overflow: hidden;
+            border-left: 1px solid #edebe9;
+            background: #fff;
+            color: #44403c;
+
+            #cp-app-contacts-container,
+            #cp-app-contacts-messaging,
+            .cp-app-contacts-chat {
+                box-sizing: border-box;
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                overflow: hidden;
+            }
+
+            #cp-app-contacts-container {
+                background: #fff;
+            }
+
+            #cp-app-contacts-messaging {
+                background: #fff;
+                color: #44403c;
+            }
+
+            .cp-app-contacts-header {
+                height: 49px;
+                border-bottom: 1px solid #edebe9;
+                background: #fff !important;
+                color: #1c1917;
+                font-size: 13px;
+                font-weight: 600;
+
+                .cp-app-contacts-header-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 0 16px;
+                    font-size: 13.5px;
+
+                    svg {
+                        width: 14px;
+                        height: 14px;
+                        margin: 0;
+                        color: #067647;
+                    }
+                }
+
+                .cp-app-contacts-more-history {
+                    height: 40px;
+                    line-height: 20px;
+                    margin-right: 5px;
+                    padding: 10px;
+                    border-radius: 8px;
+                    color: #78716c;
+
+                    &:hover { background: #f5f5f4; }
+                }
+
+                .cp-tasknode-chat-collapse {
+                    display: inline-flex;
+                    width: 34px;
+                    height: 34px;
+                    flex: 0 0 34px;
+                    align-items: center;
+                    justify-content: center;
+                    margin-right: 8px;
+                    border: 0;
+                    border-radius: 8px;
+                    background: transparent;
+                    color: #78716c;
+                    cursor: pointer;
+
+                    &:hover {
+                        background: #f5f5f4;
+                        color: #1c1917;
+                    }
+                    svg {
+                        width: 16px;
+                        height: 16px;
+                        margin: 0;
+                    }
+                }
+            }
+
+            .cp-app-contacts-tips { display: none; }
+
+            .cp-app-contacts-chat .cp-app-contacts-messages {
+                box-sizing: border-box;
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin: 0;
+                padding: 16px !important;
+                overflow-x: hidden;
+                overflow-y: auto;
+                background: #fff;
+
+                .cp-app-contacts-message {
+                    box-sizing: border-box;
+                    display: flex;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: 100%;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    color: #44403c;
+
+                    > div { padding: 0; }
+
+                    .cp-app-contacts-sender {
+                        width: auto;
+                        margin: 0 0 4px;
+                        padding: 0 3px;
+                        background: transparent;
+                        color: #78716c;
+                        font-size: 10.5px;
+                        font-weight: 550;
+                    }
+
+                    .cp-app-contacts-sender-time,
+                    .cp-app-contacts-time { display: none !important; }
+
+                    .cp-app-contacts-content {
+                        box-sizing: border-box;
+                        max-width: 94%;
+                        min-width: 0;
+                        flex: 0 1 auto;
+                        overflow-wrap: anywhere;
+                        word-break: break-word;
+                        border: 1px solid #edebe9;
+                        border-radius: 16px 16px 16px 4px;
+                        background: #fafaf9;
+                        padding: 12px 14px !important;
+                        color: #44403c;
+                        font-size: 13px;
+                        line-height: 1.6;
+
+                        > p { margin: 0 !important; }
+                        > p + p { margin-top: 8px !important; }
+                        > * + * { margin-top: 8px !important; }
+                        li + li { margin-top: 4px; }
+                        pre,
+                        code,
+                        a {
+                            overflow-wrap: anywhere;
+                            word-break: break-word;
+                        }
+                        pre {
+                            box-sizing: border-box;
+                            max-width: 100%;
+                            overflow-x: auto;
+                            white-space: pre-wrap;
+                        }
+                        img,
+                        video {
+                            max-width: 100%;
+                            height: auto;
+                        }
+                        table {
+                            display: block;
+                            max-width: 100%;
+                            overflow-x: auto;
+                        }
+                    }
+
+                    &.cp-tasknode-chat-own {
+                        align-items: flex-end;
+
+                        .cp-app-contacts-sender { display: none !important; }
+                        .cp-app-contacts-content {
+                            max-width: calc(100% - 32px);
+                            margin-left: 32px;
+                            border-color: #1c1917;
+                            border-radius: 16px 16px 4px 16px;
+                            background: #1c1917;
+                            padding: 10px 14px !important;
+                            color: #fff;
+                        }
+                    }
+
+                    &.cp-tasknode-chat-assistant {
+                        align-items: flex-start;
+
+                        .cp-app-contacts-sender {
+                            display: block !important;
+                            color: #78716c;
+                            font-size: 10.5px;
+                            font-weight: 550;
+                        }
+                        .cp-app-contacts-content {
+                            max-width: 100%;
+                            margin-left: 0;
+                            padding: 12px 14px !important;
+                            border-color: #edebe9;
+                            border-radius: 16px 16px 16px 4px;
+                            background: #fafaf9;
+                            color: #44403c;
+
+                            strong { font-weight: inherit; }
+                        }
+                    }
+                }
+            }
+
+            .cp-app-contacts-input {
+                box-sizing: border-box;
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                min-height: 82px;
+                flex: 0 0 auto;
+                display: flex;
+                flex-direction: column;
+                gap: 0;
+                border-top: 1px solid #edebe9;
+                background: #fff !important;
+                padding: 12px;
+
+                .cp-tasknode-chat-composer {
+                    box-sizing: border-box;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: 100%;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    border: 1px solid #e7e5e4;
+                    border-radius: 16px;
+                    background: #fff;
+                    padding: 8px 8px 8px 12px;
+
+                    &:focus-within { border-color: #a8a29e; }
+                }
+
+                textarea {
+                    box-sizing: border-box;
+                    width: 0;
+                    min-width: 0;
+                    max-width: 100%;
+                    height: 32px;
+                    min-height: 32px;
+                    flex: 1 1 0;
+                    margin: 0;
+                    border: 0;
+                    border-radius: 0;
+                    background: transparent !important;
+                    padding: 6px 2px;
+                    color: #1c1917;
+                    font: 13px/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+
+                    &:focus-visible {
+                        outline: none;
+                    }
+                }
+
+                .cp-tasknode-chat-send {
+                    width: 32px;
+                    height: 32px !important;
+                    flex: 0 0 32px;
+                    margin: 0;
+                    border: 0;
+                    border-radius: 50%;
+                    background: #1c1917;
+                    color: #fff;
+                    transition: opacity .15s;
+
+                    &:hover { background: #000; }
+                    &.cp-tasknode-chat-send-idle { opacity: .35; }
+                    svg {
+                        width: 16px;
+                        height: 16px;
+                        margin: 0;
+                    }
+                }
+
+                .cp-tasknode-chat-note {
+                    margin: 8px 0 0;
+                    color: #a8a29e;
+                    font-size: 10.5px;
+                    line-height: 1.35;
+                    text-align: center;
+                }
+
+                .cp-tasknode-chat-status {
+                    display: none;
+                    margin: 8px 0 0;
+                    color: #57534e;
+                    font-size: 11px;
+                    font-weight: 550;
+                    line-height: 1.35;
+                    text-align: center;
+
+                    &[data-tasknode-assistant-state="pending"] {
+                        display: block;
+                    }
+
+                    &[data-tasknode-assistant-state="pending"] + .cp-tasknode-chat-note {
+                        margin-top: 3px;
+                    }
+                }
+            }
+        }
+
+        @media screen and (max-width: 1180px) {
+            .cp-toolbar-chat-drawer {
+                position: absolute;
+                z-index: 5;
+                top: 46px;
+                right: 0;
+                bottom: 0;
+                width: 340px;
+                min-width: 0;
+                max-width: 100%;
+                box-shadow: -12px 0 32px rgba(28, 25, 23, .12);
+            }
+        }
+
+        @media screen and (max-width: 560px) {
+            .cp-tasknode-editor-status {
+                .cp-tasknode-status-encryption,
+                .cp-tasknode-status-history span { display: none; }
+            }
+        }
+    }
+
     @media print {
         #cke_1_top {
             display:none !important;

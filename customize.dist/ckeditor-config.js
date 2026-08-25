@@ -16,19 +16,22 @@ CKEDITOR.editorConfig = function( config ) {
     config.removePlugins= 'resize,elementspath,liststyle';
     config.resize_enabled= false; //bottom-bar
     config.extraPlugins= 'autolink,colorbutton,colordialog,font,indentblock,justify,mediatag,print,blockbase64,mathjax,wordcount,comments';
+    // Keep the most common writing controls first. Task Node's responsive
+    // editor chrome moves trailing groups into its overflow menu as space
+    // contracts, so this order is also the product priority order.
     config.toolbarGroups= [
         // {"name":"clipboard","groups":["clipboard","undo"]},
         //{"name":"editing","groups":["find","selection"]},
-        {"name":"links"},
-        {"name":"insert"},
-        {"name":"forms"},
-        {"name":"tools"},
-        {"name":"document","groups":["mode","document","doctools"]},
-        {"name":"others"},
         {"name":"basicstyles","groups":["basicstyles","cleanup"]},
         {"name":"paragraph","groups":["list","indent","blocks","align","bidi"]},
         {"name":"styles"},
+        {"name":"links"},
         {"name":"colors"},
+        {"name":"insert"},
+        {"name":"tools"},
+        {"name":"document","groups":["mode","document","doctools"]},
+        {"name":"forms"},
+        {"name":"others"},
         {"name":"print"}];
 
     config.mathJaxLib = '/pad/mathjax/MathJax.js?config=TeX-AMS_HTML';

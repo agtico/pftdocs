@@ -18,10 +18,9 @@ define([
     '/common/messenger-ui.js',
     '/customize/messages.js',
     '/customize/pages.js',
-    '/common/pad-types.js',
     '/common/common-icons.js',
 ], function ($, Config, ApiConfig, Broadcast, UIElements, UI, Hash, Util, Feedback, MT, Badges, h,
-MessengerUI, Messages, Pages, PadTypes, Icons) {
+MessengerUI, Messages, Pages, Icons) {
     var Common;
 
     var Bar = {
@@ -558,7 +557,6 @@ MessengerUI, Messages, Pages, PadTypes, Icons) {
         if (!config.metadataMgr) {
             throw new Error("You must provide a `metadataMgr` to display the chat");
         }
-        if (!PadTypes.isAvailable('contacts')) { return; }
         var $content = $('<div>', {'class': 'cp-toolbar-chat-drawer'});
         $content.on('drop dragover', function (e) {
             e.preventDefault();
@@ -592,7 +590,10 @@ MessengerUI, Messages, Pages, PadTypes, Icons) {
             config.$contentContainer.removeClass('cp-chat-visible');
         };
         var show = function () {
-            if (Bar.isEmbed) { $content.hide(); return; }
+            if (Bar.isEmbed && !window.CryptPad_taskNodeContext) {
+                $content.hide();
+                return;
+            }
             $content.show();
             // scroll down chat
             var $messagebox = $content.find('.cp-app-contacts-messages');
@@ -617,8 +618,15 @@ MessengerUI, Messages, Pages, PadTypes, Icons) {
             visible = !visible;
             Common.setAttribute(['toolbar', 'chat-drawer'], visible);
         });
+        $(window).on('tasknode:document-context', function () {
+            show();
+        });
         show();
         Common.getAttribute(['toolbar', 'chat-drawer'], function (err, val) {
+            if (window.CryptPad_taskNodeContext) {
+                show();
+                return;
+            }
             if (!val || Util.isSmallScreen()) {
                 return void hide(val === false);
             }

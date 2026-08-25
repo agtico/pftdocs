@@ -5,6 +5,7 @@
 define([], function () {
     var RUNPOD_OLLAMA_IMAGE = 'ollama/ollama:latest';
     var RUNPOD_OLLAMA_DEFAULT_MODEL = 'qwen3.6:27b';
+    var RUNPOD_HUIHUI_QWEN35_ABLITERATED_MODEL = 'huihui_ai/qwen3.5-abliterated';
     var RUNPOD_SGLANG_DEFAULT_MODEL = 'Qwen/Qwen3.6-27B-FP8';
     var RUNPOD_DEFAULT_MODEL = RUNPOD_OLLAMA_DEFAULT_MODEL;
 
@@ -42,10 +43,15 @@ define([], function () {
     ];
 
     var RUNPOD_MODEL_PRESETS = [
-        { id: 'qwen3.6:27b', label: 'Qwen 3.6 27B' },
-        { id: 'qwen3.6:27b-q4_K_M', label: 'Qwen 3.6 27B Q4_K_M' },
-        { id: 'qwen3.6:27b-mxfp8', label: 'Qwen 3.6 27B MXFP8' },
-        { id: 'qwen3.6:27b-nvfp4', label: 'Qwen 3.6 27B NVFP4' },
+        { id: 'qwen3.6:27b', label: 'Qwen 3.6 27B', nativeOllama: true },
+        { id: 'qwen3.6:27b-q4_K_M', label: 'Qwen 3.6 27B Q4_K_M', nativeOllama: true },
+        { id: 'qwen3.6:27b-mxfp8', label: 'Qwen 3.6 27B MXFP8', nativeOllama: true },
+        { id: 'qwen3.6:27b-nvfp4', label: 'Qwen 3.6 27B NVFP4', nativeOllama: true },
+        {
+            id: RUNPOD_HUIHUI_QWEN35_ABLITERATED_MODEL,
+            label: 'Huihui Qwen 3.5 27B Abliterated',
+            nativeOllama: true
+        },
         { id: 'custom', label: 'Custom Ollama model' }
     ];
 
@@ -88,6 +94,42 @@ define([], function () {
 
     var isLegacySglangImage = function (value) {
         return /sglang|lmsysorg/u.test(String(value || ''));
+    };
+
+    var isRunPodNativeOllamaModel = function (value) {
+        var modelId = String(value || '').trim();
+        if (!modelId || isLegacySglangModel(modelId)) { return false; }
+        var preset = RUNPOD_MODEL_PRESETS.filter(function (entry) {
+            return entry.id === modelId;
+        })[0];
+        if (preset) { return preset.nativeOllama === true; }
+        return /:/u.test(modelId);
+    };
+
+    var getRunPodModelAliases = function (value) {
+        var modelId = String(value || '').trim();
+        var aliases = {};
+        var lastSlash = modelId.lastIndexOf('/');
+        var lastColon = modelId.lastIndexOf(':');
+        var hasExplicitTag = lastColon > lastSlash;
+        if (!modelId) { return []; }
+        aliases[modelId] = true;
+        if (!hasExplicitTag) {
+            aliases[modelId + ':latest'] = true;
+        } else if (modelId.endsWith(':latest')) {
+            aliases[modelId.slice(0, -':latest'.length)] = true;
+        }
+        return Object.keys(aliases);
+    };
+
+    var isRunPodModelAvailable = function (modelId, modelIds) {
+        var aliasMap = {};
+        getRunPodModelAliases(modelId).forEach(function (alias) {
+            aliasMap[alias] = true;
+        });
+        return (Array.isArray(modelIds) ? modelIds : []).some(function (availableId) {
+            return aliasMap[String(availableId || '').trim()] === true;
+        });
     };
 
     var normalizeRunPodSettings = function (value) {
@@ -225,6 +267,7 @@ define([], function () {
     return {
         RUNPOD_DEFAULT_MODEL: RUNPOD_DEFAULT_MODEL,
         RUNPOD_GPU_PRESETS: RUNPOD_GPU_PRESETS,
+        RUNPOD_HUIHUI_QWEN35_ABLITERATED_MODEL: RUNPOD_HUIHUI_QWEN35_ABLITERATED_MODEL,
         RUNPOD_MODEL_PRESETS: RUNPOD_MODEL_PRESETS,
         RUNPOD_OLLAMA_DEFAULT_MODEL: RUNPOD_OLLAMA_DEFAULT_MODEL,
         RUNPOD_OLLAMA_IMAGE: RUNPOD_OLLAMA_IMAGE,
@@ -233,9 +276,12 @@ define([], function () {
         buildPodPayload: buildPodPayload,
         getDefaultRunPodSettings: getDefaultRunPodSettings,
         getRunPodGpuPreset: getRunPodGpuPreset,
+        getRunPodModelAliases: getRunPodModelAliases,
         getSelectedGpuTypeIds: getSelectedGpuTypeIds,
         isLegacySglangImage: isLegacySglangImage,
         isLegacySglangModel: isLegacySglangModel,
+        isRunPodModelAvailable: isRunPodModelAvailable,
+        isRunPodNativeOllamaModel: isRunPodNativeOllamaModel,
         normalizeRunPodSettings: normalizeRunPodSettings,
         toPositiveInteger: toPositiveInteger
     };

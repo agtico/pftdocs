@@ -1228,9 +1228,9 @@ define([
             });
             cb($dom[0]);
         };
-        framework.setFileImporter({ accept: ['.md', 'text/html'] }, function(content, f, cb) {
+        framework.setFileImporter({ accept: ['.md', '.txt', 'text/html'] }, function(content, f, cb) {
             if (!f) { return; }
-            if (/\.md$/.test(f.name)) {
+            if (/\.(?:md|txt)$/i.test(f.name)) {
                 var mdDom = Exporter.importMd(content, framework._.sfCommon);
                 return importMediaTags(mdDom, function(dom) {
                     cb(Hyperjson.fromDOM(dom));
@@ -1304,6 +1304,119 @@ define([
             }
             wordCount.innerText = Messages._getKey('pad_wordCount', [editor.wordCount.wordCount]);
         });
+
+        // CKEditor 4 assumes a wide, fixed toolbar. In Task Node it shares the
+        // document surface with chat, so native wrapping produces clipped and
+        // detached controls. Preserve the original controls and handlers, but
+        // progressively move lower-priority groups into one accessible menu.
+        var taskNodeEditorChromeReady = false;
+        var setupTaskNodeEditorChrome = function () {
+            if (taskNodeEditorChromeReady || !$('body').hasClass('cp-tasknode-document')) { return; }
+            var $toolbox = $('.cke_toolbox_main').first();
+            var $contents = $('#cke_1_contents').first();
+            if (!$toolbox.length || !$contents.length) { return; }
+            taskNodeEditorChromeReady = true;
+
+            var $groups = $toolbox.children('.cke_toolbar').detach();
+            var primary = h('div.cp-tasknode-formatbar-primary', {
+                role: 'toolbar',
+                'aria-label': 'Document formatting'
+            });
+            var overflow = h('div.cp-tasknode-formatbar-overflow', {
+                role: 'toolbar',
+                'aria-label': 'More document formatting'
+            });
+            var more = h('button.cp-tasknode-formatbar-more', {
+                type: 'button',
+                title: 'More formatting',
+                'aria-label': 'More formatting',
+                'aria-expanded': 'false'
+            }, '⋯');
+            var row = h('div.cp-tasknode-formatbar', [primary, more, overflow]);
+            var $primary = $(primary);
+            var $overflow = $(overflow);
+            var $more = $(more);
+            var $row = $(row);
+
+            // Task Node owns this editor chrome; do not inherit CryptPad's
+            // persisted whole-toolbar collapse state from another surface.
+            $toolbox.css('display', '');
+            $primary.append($groups);
+            $toolbox.empty().append(row);
+
+            var historyButton = h('button.cp-tasknode-status-history', {
+                type: 'button',
+                title: 'Open version history'
+            }, [Icons.get('history'), h('span', 'Version history')]);
+            $(historyButton).click(function () {
+                $('.cp-toolbar-icon-history').first().trigger('click');
+            });
+            var status = h('div.cp-tasknode-editor-status', {
+                role: 'status',
+                'aria-label': 'Document status'
+            }, [
+                h('span.cp-tasknode-status-encryption', [
+                    h('span.cp-tasknode-status-dot'),
+                    'Encrypted document'
+                ]),
+                h('span.cp-tasknode-status-details', [wordCount, historyButton])
+            ]);
+            $contents.after(status);
+
+            var closeOverflow = function () {
+                $row.removeClass('cp-tasknode-formatbar-open');
+                $more.attr('aria-expanded', 'false');
+            };
+            var fitToolbar = function () {
+                closeOverflow();
+                $primary.append($groups);
+                $more.show();
+                if ($row.innerWidth() < 100) {
+                    window.setTimeout(fitToolbar, 50);
+                    return;
+                }
+                var visibleGroups = function () {
+                    return $primary.children('.cke_toolbar');
+                };
+                // The flex row has already reserved the More button and gap in
+                // primary.clientWidth. Comparing with a separately estimated
+                // width can undershoot by a few pixels and evict every group.
+                while (visibleGroups().length > 1 && primary.scrollWidth > primary.clientWidth + 1) {
+                    $overflow.prepend(visibleGroups().last());
+                }
+                var hasOverflow = $overflow.find('.cke_button, .cke_combo').filter(function () {
+                    return this.style.display !== 'none';
+                }).length > 0;
+                $more.toggle(hasOverflow);
+                if (!hasOverflow) { closeOverflow(); }
+            };
+
+            $more.click(function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var open = !$row.hasClass('cp-tasknode-formatbar-open');
+                $row.toggleClass('cp-tasknode-formatbar-open', open);
+                $more.attr('aria-expanded', open ? 'true' : 'false');
+            });
+            $overflow.click(function (e) { e.stopPropagation(); });
+            $(document).on('click.cpTaskNodeFormatbar', closeOverflow);
+            $(document).on('keydown.cpTaskNodeFormatbar', function (e) {
+                if (e.key === 'Escape') { closeOverflow(); }
+            });
+
+            if (window.ResizeObserver) {
+                new window.ResizeObserver(function () {
+                    window.requestAnimationFrame(fitToolbar);
+                }).observe(row);
+            } else {
+                $(window).on('resize.cpTaskNodeFormatbar', fitToolbar);
+            }
+            window.requestAnimationFrame(fitToolbar);
+            window.setTimeout(fitToolbar, 100);
+            window.setTimeout(fitToolbar, 400);
+        };
+        $(window).on('tasknode:document-context', setupTaskNodeEditorChrome);
+        setupTaskNodeEditorChrome();
 
         // export the typing tests to the window.
         // call like `test = easyTest()`

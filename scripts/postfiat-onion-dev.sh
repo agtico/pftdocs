@@ -7,6 +7,9 @@ TOOLS_DIR="$STATE_DIR/tools"
 DATA_DIR="$STATE_DIR/tor-data"
 TORRC="$STATE_DIR/torrc"
 PID_FILE="$STATE_DIR/tor.pid"
+HEALTH_FAILURE_FILE="$STATE_DIR/health-failures"
+BOOTSTRAP_LOG_START=0
+TOR_WAS_STARTED=0
 
 HTTP_HOST="${POSTFIAT_ONION_HTTP_HOST:-127.0.0.1}"
 HTTP_PORT="${POSTFIAT_ONION_HTTP_PORT:-3200}"
@@ -34,6 +37,9 @@ Commands:
   dev         Start Tor, write config/config.js, then run npm run dev
   status      Print onion URLs and process state
   check       Fetch /api/config over Tor SOCKS
+  health      Verify the local app, Tor process, and onion route
+  recover     Record route failures and restart managed Tor after a threshold
+  tor-service Run Tor in the foreground for systemd supervision
   stop        Stop the Tor process started by this script
 
 Environment overrides:
@@ -43,6 +49,7 @@ Environment overrides:
   POSTFIAT_ONION_WS_PORT         Local CryptPad websocket port, default 3203
   POSTFIAT_ONION_SOCKS_PORT      Local Tor SOCKS port, default 19050
   POSTFIAT_ONION_COMPRESS        Set to 0 to skip static .gz/.br generation
+  POSTFIAT_ONION_HEALTH_FAILURES Consecutive failures before recovery, default 3
   POSTFIAT_PFTL_RPC_URL          PFTL JSON-RPC URL for same-origin Task Node proxy
   POSTFIAT_PFTL_WSS_URL          PFTL websocket URL for future signing flows
   POSTFIAT_PFTL_ARCHIVE_WSS_URL  PFTL archive websocket URL for account_tx history
@@ -134,6 +141,10 @@ start_tor() {
         return
     fi
 
+    if [ -f "$DATA_DIR/notice.log" ]; then
+        BOOTSTRAP_LOG_START="$(wc -l < "$DATA_DIR/notice.log")"
+    fi
+    TOR_WAS_STARTED=1
     setsid -f "$tor_bin" -f "$TORRC" > "$DATA_DIR/stdout.log" 2>&1
 
     for _ in $(seq 1 50); do
@@ -152,9 +163,19 @@ start_tor() {
 
 wait_ready() {
     for _ in $(seq 1 120); do
+        local bootstrapped=1
+        if [ "$TOR_WAS_STARTED" = "1" ]; then
+            if tail -n "+$((BOOTSTRAP_LOG_START + 1))" "$DATA_DIR/notice.log" 2>/dev/null |
+                rg -q 'Bootstrapped 100%'; then
+                bootstrapped=0
+            fi
+        elif rg -q 'Bootstrapped 100%' "$DATA_DIR/notice.log" 2>/dev/null; then
+            bootstrapped=0
+        fi
+
         if [ -s "$MAIN_DIR/hostname" ] &&
            [ -s "$SAFE_DIR/hostname" ] &&
-           rg -q 'Bootstrapped 100%' "$DATA_DIR/notice.log" 2>/dev/null; then
+           [ "$bootstrapped" = "0" ]; then
             return
         fi
         sleep 1
@@ -249,6 +270,81 @@ check_onion() {
         "http://$main/api/config" | head -40
 }
 
+local_app_healthy() {
+    curl --max-time 5 --fail --silent --output /dev/null \
+        "http://$HTTP_HOST:$HTTP_PORT/api/config"
+}
+
+onion_healthy() {
+    local pid main
+    pid="$(tor_pid)"
+    [ -n "$pid" ] || return 1
+    main="$(main_host)"
+    curl --socks5-hostname "$SOCKS_HOST:$SOCKS_PORT" \
+        --max-time 20 \
+        --fail \
+        --silent \
+        --output /dev/null \
+        "http://$main/api/config"
+}
+
+health_onion() {
+    if ! local_app_healthy; then
+        echo "PFDocs is not responding on $HTTP_HOST:$HTTP_PORT." >&2
+        return 1
+    fi
+    if ! onion_healthy; then
+        echo "PFDocs is local-only: its Tor onion route is not responding." >&2
+        return 1
+    fi
+    rm -f "$HEALTH_FAILURE_FILE"
+    echo "PFDocs onion route is healthy: http://$(main_host)/login/"
+}
+
+recover_onion() {
+    mkdir -p "$STATE_DIR"
+
+    # A Tor restart cannot repair a dead application, so keep the two failure
+    # domains separate and leave pftdocs.service to its own restart policy.
+    if ! local_app_healthy; then
+        echo "PFDocs is not responding locally; not restarting Tor." >&2
+        return 1
+    fi
+
+    if onion_healthy; then
+        rm -f "$HEALTH_FAILURE_FILE"
+        echo "PFDocs onion route is healthy."
+        return
+    fi
+
+    local failures=0 threshold
+    threshold="${POSTFIAT_ONION_HEALTH_FAILURES:-3}"
+    if [ -s "$HEALTH_FAILURE_FILE" ]; then
+        failures="$(cat "$HEALTH_FAILURE_FILE")"
+    fi
+    case "$failures" in
+        ''|*[!0-9]*) failures=0 ;;
+    esac
+    failures=$((failures + 1))
+    echo "$failures" > "$HEALTH_FAILURE_FILE"
+
+    if [ "$failures" -lt "$threshold" ]; then
+        echo "Tor onion health failure $failures/$threshold; waiting for another check." >&2
+        return 1
+    fi
+
+    echo "Tor onion route failed $failures consecutive checks; restarting pftdocs-tor.service." >&2
+    rm -f "$HEALTH_FAILURE_FILE"
+    systemctl --user restart pftdocs-tor.service
+}
+
+run_tor_service() {
+    local tor_bin
+    tor_bin="$(ensure_tor_bin)"
+    write_torrc
+    exec "$tor_bin" -f "$TORRC"
+}
+
 stop_tor() {
     local pid
     pid="$(tor_pid)"
@@ -272,12 +368,13 @@ case "$cmd" in
         start_tor
         wait_ready
         write_config
+        node "$ROOT/scripts/postfiat-build-login-bundle.js"
         if [ "${POSTFIAT_ONION_COMPRESS:-1}" != "0" ]; then
             node "$ROOT/scripts/postfiat-compress-static.js" "$ROOT/www"
         fi
         print_status
         cd "$ROOT"
-        exec npm run start
+        exec npm run package
         ;;
     dev)
         start_tor
@@ -292,6 +389,15 @@ case "$cmd" in
         ;;
     check)
         check_onion
+        ;;
+    health)
+        health_onion
+        ;;
+    recover)
+        recover_onion
+        ;;
+    tor-service)
+        run_tor_service
         ;;
     stop)
         stop_tor

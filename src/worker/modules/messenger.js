@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 const factory = (Crypto, Hash, Util, Realtime, Messaging,
-                Constants, PadTypes, nThen) => {
+                Constants, nThen) => {
     var Curve = Crypto.Curve;
 
     const Msg = {};
@@ -961,7 +961,6 @@ const factory = (Crypto, Hash, Util, Realtime, Messaging,
             return store.messenger;
         }
 
-        if (!PadTypes.isAvailable('contacts')) { return; }
         var ctx = {
             store: store,
             Store: cfg.Store,
@@ -1126,6 +1125,5 @@ module.exports = factory(
     require('../../common/common-realtime'),
     require('../components/messaging'),
     require('../../common/common-constants'),
-    require('../../common/pad-types'),
     require('nthen')
 );

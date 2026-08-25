@@ -47,13 +47,17 @@ $(function () {
             w();
         });
     }).nThen(function () {
-        require([
+        var pageLess = 'less!/customize/src/less2/pages/page-' + pageName + '.less';
+        var pageDependencies = [
             '/api/config',
             '/common/common-util.js',
             'optional!/api/instance',
-            'less!/customize/src/less2/pages/page-' + pageName + '.less',
             'css!/components/bootstrap/dist/css/bootstrap.min.css',
-        ], function (ApiConfig, Util, Instance) {
+        ];
+        // The Post Fiat login page ships critical inline styles. Rendering it
+        // must not wait for the full runtime LESS import tree over Tor.
+        if (pageName !== 'login') { pageDependencies.push(pageLess); }
+        require(pageDependencies, function (ApiConfig, Util, Instance) {
             var $main = $(infoPage());
             var titleSuffix = (Util.find(Instance, ['name','default']) || '').trim();
             if (!titleSuffix || titleSuffix === ApiConfig.httpUnsafeOrigin) {
@@ -63,6 +67,12 @@ $(function () {
             $('#placeholder').remove();
 
             $body.append($main);
+
+            if (pageName === 'login') {
+                require([pageLess], function () {}, function (err) {
+                    console.warn('Unable to load non-critical login styles', err);
+                });
+            }
 
             if (/^\/register\//.test(pathname)) {
                 require([ '/register/main.js' ], function () {});

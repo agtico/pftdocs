@@ -14,6 +14,7 @@ define([
     var pftWalletSessionKey = 'PFT_wallet_session';
     var pftSessionWalletStorageKey = 'PFT_session_wallet';
     var pftLastWalletAddressKey = 'PFT_last_wallet_address';
+    var cryptpadStorePrefix = 'CRYPTPAD_STORE|';
     var pftWalletAddressPattern = /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/;
     var walletSessionResponder;
     var postFiatPreservedLocalKeys = [
@@ -25,6 +26,7 @@ define([
         'PFT_runpod_settings_v1',
         'PFT_ai_chat_sessions_v1',
         'PFT_ai_chat_options_v1',
+        'PFT_nostr_peer_messages_v1',
         'PFT_tasknode_ipfs_json_v1:index',
     ];
     var postFiatWalletSwitchPreservedLocalKeys = [
@@ -37,6 +39,8 @@ define([
     ];
     var postFiatPreservedLocalPrefixes = [
         'PFT_tasknode_ipfs_json_v1:',
+        'PFT_ai_chat_memory_v1:',
+        'PFT_ai_chat_context_pack_v1:',
     ];
 
     var safeSet = function (key, val) {
@@ -89,14 +93,24 @@ define([
             pftSessionWalletStorageKey,
         ].concat(walletLoginSessionKeys));
     };
+    var normalizeCryptpadStoreKey = function (key) {
+        key = String(key || '');
+        return key.indexOf(cryptpadStorePrefix) === 0 ?
+            key.slice(cryptpadStorePrefix.length) : key;
+    };
     var shouldPreservePostFiatLocalKey = function (key) {
+        key = normalizeCryptpadStoreKey(key);
         if (postFiatPreservedLocalKeys.indexOf(key) !== -1) { return true; }
         return postFiatPreservedLocalPrefixes.some(function (prefix) {
             return key.indexOf(prefix) === 0;
         });
     };
     var shouldPreservePostFiatWalletSwitchLocalKey = function (key) {
+        key = normalizeCryptpadStoreKey(key);
         return postFiatWalletSwitchPreservedLocalKeys.indexOf(key) !== -1;
+    };
+    var shouldPreserveCryptpadThemeKey = function (key) {
+        return key === 'colortheme' || key === cryptpadStorePrefix + 'colortheme';
     };
     var removeMismatchedSessionWallet = function (name) {
         var raw = sessionStorage[pftSessionWalletStorageKey];
@@ -115,10 +129,11 @@ define([
         return typeof(name) === 'string' && pftWalletAddressPattern.test(name);
     };
     var isPostFiatWalletScopedLocalKey = function (key) {
+        var normalized = normalizeCryptpadStoreKey(key);
         if (shouldPreservePostFiatWalletSwitchLocalKey(key)) {
             return false;
         }
-        return /^PFT_/.test(String(key || ''));
+        return /^PFT_/.test(normalized);
     };
     var hasPostFiatWalletScopedLocalState = function () {
         try {
@@ -387,7 +402,7 @@ define([
                 if (typeof(localStorage[k]) === 'function') { return; }
                 if (/^CRYPTPAD_CACHE/.test(k) || /^LESS_CACHE/.test(k) ||
                         k === Constants.fileHashKey ||
-                        /^CRYPTPAD_STORE|colortheme/.test(k) ||
+                        shouldPreserveCryptpadThemeKey(k) ||
                         shouldPreservePostFiatLocalKey(k)) { return; }
                 delete localStorage[k];
             });

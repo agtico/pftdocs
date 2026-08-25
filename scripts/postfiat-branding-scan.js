@@ -45,6 +45,7 @@ const INTERNAL_LINE_ALLOWLIST = [
 
 const shouldScanFile = (filePath) => {
     if (BINARY_OR_GENERATED_RE.test(filePath)) { return false; }
+    if (path.basename(filePath) === 'postfiat-login-bundle.js') { return false; }
     if (/node_modules|\.git/u.test(filePath)) { return false; }
     return true;
 };

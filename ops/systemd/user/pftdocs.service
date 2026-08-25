@@ -1,0 +1,17 @@
+[Unit]
+Description=PFDocs encrypted document workspace
+Wants=network-online.target pftdocs-tor.service
+After=network-online.target pftdocs-tor.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pfrpc/repos/pftdocs
+ExecStartPre=/usr/bin/npm run postfiat:build-login-bundle
+ExecStartPre=/usr/bin/npm run postfiat:compress-static
+ExecStart=/usr/bin/npm run package
+Restart=always
+RestartSec=5s
+TimeoutStartSec=180s
+
+[Install]
+WantedBy=default.target

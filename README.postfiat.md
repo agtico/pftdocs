@@ -2,6 +2,23 @@
 
 This repository is a Post Fiat native fork of upstream CryptPad.
 
+## Task Node launch bridge
+
+The focused Task Node integration creates rich-text pads through `/tasknode/`.
+Configure the exact permitted Task Node origins before enabling the Task Node
+Docs flag:
+
+```bash
+PFDOCS_TASKNODE_ORIGINS=https://tasknode.postfiat.org
+```
+
+The bridge rejects wildcard and non-HTTP origins, sends edit/view capabilities
+only to the exact opener origin, and then redirects the popup into the new pad.
+The product surface exposes only the internal drive dependency and the rich-text
+pad app. Abandoned data is eligible for eviction after 180 inactive days,
+archived blocks are retained for 30 days, and individual uploads are capped at
+20 MiB.
+
 Base upstream:
 
 - Repository: `https://github.com/cryptpad/cryptpad`
