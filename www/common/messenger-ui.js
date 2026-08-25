@@ -397,13 +397,16 @@ define([
                 headerContent = [
                     h('div.cp-app-contacts-header-title', [
                         Icons.get('sparkles'),
-                        h('span', Messages.contacts_padTitle)
+                        h('span.cp-tasknode-chat-title', Messages.contacts_padTitle)
                     ]),
                     moreHistory,
                     collapseTaskNodeChat
                 ];
             }
             var header = h('div.cp-app-contacts-header', headerContent);
+            $(window).on('tasknode:document-context', function () {
+                $(header).find('.cp-tasknode-chat-title').text('Document chat');
+            });
 
             var priv = metadataMgr.getPrivateData();
 
@@ -433,8 +436,10 @@ define([
                 'data-tasknode-assistant-state': 'idle'
             });
             var taskNodeChatNote = h('p.cp-tasknode-chat-note',
-                'Chat can read this document. Billing is usage-based.');
+                'Mention @ODV or @coach for a document-aware reply.');
             $(input).on('input', function () {
+                input.style.height = '32px';
+                input.style.height = Math.min(input.scrollHeight, 112) + 'px';
                 $(sendButton).toggleClass('cp-tasknode-chat-send-idle', !String(input.value || '').trim());
             });
 
@@ -567,6 +572,7 @@ define([
                         return void console.error('failed to send', e);
                     }
                     input.value = '';
+                    input.style.height = '32px';
                     $(sendButton).addClass('cp-tasknode-chat-send-idle');
                     sending = false;
                     debug('sent successfully');

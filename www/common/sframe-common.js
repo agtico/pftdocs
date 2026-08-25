@@ -886,6 +886,7 @@ define([
                 $('body').addClass('cp-tasknode-document');
                 var identity = data.identity || {};
                 var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
+                var firstTaskNodeContext = !window.CryptPad_taskNodeContext;
                 window.CryptPad_taskNodeContext = {
                     channelHash: String(data.channelHash || ''),
                     displayName: displayName,
@@ -911,8 +912,15 @@ define([
                     }
                 }
                 if (privateData.app !== 'sheet') {
-                    funcs.setAttribute(['toolbar', 'chat-drawer'], true);
-                    $(window).trigger('tasknode:document-context');
+                    // The Task Node Docs shell owns the chat trigger. Start each
+                    // document with a clean reading surface and let its Chat
+                    // button reveal the encrypted conversation rail on demand.
+                    if (firstTaskNodeContext) {
+                        funcs.setAttribute(['toolbar', 'chat-drawer'], false);
+                    }
+                    $(window).trigger('tasknode:document-context', {
+                        initial: firstTaskNodeContext
+                    });
                 }
             });
             ctx.sframeChan.on('EV_TASKNODE_COMMAND', function (data) {

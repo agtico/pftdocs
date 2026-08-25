@@ -124,7 +124,7 @@ test('Task Node document context aligns titles and encrypted chat identity', () 
     assert.match(messengerWorkerSource, /OPEN_PAD_CHAT/);
     assert.match(commonSource, /cp-tasknode-document/);
     assert.match(commonSource, /privateData\.app !== 'sheet'/);
-    assert.match(toolbarSource, /getPrivateData\(\)\.app !== 'sheet'/);
+    assert.match(toolbarSource, /getPrivateData\(\)\.app === 'sheet'/);
     assert.match(outerSource, /isEmbed: parsed\.hashData && parsed\.hashData\.embed \|\| cfg\.integration \|\| Boolean\(taskNodeSession\)/);
     assert.match(outerSource, /taskNodeSession: taskNodeSession/);
     assert.match(padStyleSource, /&\.cp-tasknode-document/);
@@ -138,7 +138,7 @@ test('Task Node document context aligns titles and encrypted chat identity', () 
     assert.match(messengerSource, /tasknode-assistant-' \+ assistantMessage\.persona/);
     assert.match(messengerSource, /assistantMessage \? assistantMessage\.body : msg\.text/);
     assert.match(messengerSource, /Ask about this doc…/);
-    assert.match(messengerSource, /Chat can read this document\. Billing is usage-based\./);
+    assert.match(messengerSource, /Mention @ODV or @coach for a document-aware reply\./);
     assert.match(padStyleSource, /cp-tasknode-chat-assistant/);
     assert.match(padStyleSource, /\.cp-tasknode-chat-assistant\s*\{[\s\S]*\.cp-app-contacts-sender\s*\{[\s\S]*display:\s*block !important/);
     assert.doesNotMatch(padStyleSource, /background:\s*#f0fdf4/);
@@ -160,6 +160,10 @@ test('Task Node document context aligns titles and encrypted chat identity', () 
     assert.doesNotMatch(messengerSource, /requestTaskNodeAssistant\) !== 'function' \|\| assistantState\.pending/);
     assert.match(messengerSource, /data-tasknode-assistant-state/);
     assert.match(padStyleSource, /cp-tasknode-chat-status/);
+    assert.match(commonSource, /Start each[\s\S]*clean reading surface/);
+    assert.match(commonSource, /funcs\.setAttribute\(\['toolbar', 'chat-drawer'\], false\)/);
+    assert.match(toolbarSource, /embedded rail should never force itself open/);
+    assert.match(messengerSource, /Document chat/);
     assert.match(commonSource + padStyleSource, /cp-app-pad-comments/);
     assert.match(editorStyleSource, /max-width: 824px/);
 });
@@ -180,12 +184,12 @@ test('Task Node editor chrome prioritizes controls and moves overflow without cl
     assert.match(padSource, /window\.setTimeout\(fitToolbar, 400\)/);
     assert.match(padStyleSource, /\.cke_toolgroup\s*\{[\s\S]*margin-bottom:\s*0/);
     assert.match(padStyleSource, /\.cke_combo\s*\{[\s\S]*margin-bottom:\s*0/);
-    assert.match(padStyleSource, /padding:\s*12px 14px !important/);
+    assert.match(padStyleSource, /padding:\s*0 2px !important/);
     assert.match(padSource, /Version history/);
 });
 
 test('Task Node document chat contains narrow composers and unbroken message content', () => {
-    assert.match(padStyleSource, /\.cp-toolbar-chat-drawer\s*\{[\s\S]*width:\s*340px;[\s\S]*overflow:\s*hidden;/);
+    assert.match(padStyleSource, /\.cp-toolbar-chat-drawer\s*\{[\s\S]*width:\s*384px;[\s\S]*overflow:\s*hidden;/);
     assert.match(padStyleSource, /#cp-app-contacts-container,[\s\S]*\.cp-app-contacts-chat\s*\{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
     assert.match(padStyleSource, /\.cp-app-contacts-input\s*\{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
     assert.match(padStyleSource, /\.cp-tasknode-chat-composer\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);

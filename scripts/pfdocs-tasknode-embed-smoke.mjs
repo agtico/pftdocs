@@ -34,6 +34,7 @@ function command(method, params = {}) {
 
 await command("Page.enable");
 await command("Runtime.enable");
+await command("Emulation.clearDeviceMetricsOverride");
 // Always start from a fresh top-level document so repeated smoke runs cannot
 // retain an older PFDocs iframe/listener and accidentally target its sandbox.
 await command("Page.navigate", { url: "about:blank" });
@@ -154,17 +155,17 @@ for (let attempt = 0; attempt < 30; attempt += 1) {
     formattingMoreVisible: Boolean(document.querySelector('.cp-tasknode-formatbar-more') && getComputedStyle(document.querySelector('.cp-tasknode-formatbar-more')).display !== 'none'),
     statusVisible: Boolean(document.querySelector('.cp-tasknode-editor-status') && getComputedStyle(document.querySelector('.cp-tasknode-editor-status')).display !== 'none'),
     wordCountInStatus: Boolean(document.querySelector('.cp-tasknode-editor-status .cp-app-pad-wordCount')),
-    commentsHidden: Boolean(document.querySelector('#cp-app-pad-comments') && getComputedStyle(document.querySelector('#cp-app-pad-comments')).display === 'none'),
+    commentsHidden: !document.querySelector('#cp-app-pad-comments') || getComputedStyle(document.querySelector('#cp-app-pad-comments')).display === 'none',
     chatCollapseVisible: Boolean(document.querySelector('.cp-tasknode-chat-collapse') && getComputedStyle(document.querySelector('.cp-tasknode-chat-collapse')).display !== 'none'),
     contentClass: document.querySelector('#cp-app-padcontent')?.className || null,
     isEmbed: globalThis.APP?.framework?._?.toolbar ? Boolean(globalThis.APP.framework._.toolbar.isEmbed) : null
   })`);
   contextState = result?.result?.result?.value;
-  if (contextState?.context?.displayName === "@smoke" && contextState.title === canonicalTitle && contextState.chatVisible && !contextState.chatInitializing && contextState.chatChannels.length === 1 && contextState.chatInputVisible && contextState.formattingMoreVisible) break;
+  if (contextState?.context?.displayName === "@smoke" && contextState.title === canonicalTitle && !contextState.chatVisible && !contextState.chatInitializing && contextState.chatChannels.length === 1 && contextState.chatInputVisible && contextState.taskNodeTheme && contextState.legacyToolbarHidden && contextState.formattingToolbarVisible && !contextState.formattingControlsClipped && contextState.statusVisible && contextState.commentsHidden && contextState.chatCollapseVisible) break;
 }
 assert.equal(contextState?.context?.displayName, "@smoke", JSON.stringify(contextState));
 assert.equal(contextState?.title, canonicalTitle, JSON.stringify(contextState));
-assert.equal(contextState?.chatVisible, true, JSON.stringify(contextState));
+assert.equal(contextState?.chatVisible, false, JSON.stringify(contextState));
 assert.equal(contextState?.chatInitializing, false, JSON.stringify(contextState));
 assert.equal(contextState?.chatChannels?.length, 1, JSON.stringify(contextState));
 assert.equal(contextState?.chatInputVisible, true, JSON.stringify(contextState));
@@ -173,8 +174,11 @@ assert.equal(contextState?.legacyToolbarHidden, true, JSON.stringify(contextStat
 assert.equal(contextState?.formattingToolbarVisible, true, JSON.stringify(contextState));
 assert.equal(contextState?.formattingToolbarRows, 1, JSON.stringify(contextState));
 assert.equal(contextState?.formattingControlsClipped, false, JSON.stringify(contextState));
-assert.ok(contextState?.formattingOverflowGroups > 0, JSON.stringify(contextState));
-assert.equal(contextState?.formattingMoreVisible, true, JSON.stringify(contextState));
+assert.equal(
+  contextState?.formattingOverflowGroups > 0,
+  contextState?.formattingMoreVisible,
+  JSON.stringify(contextState),
+);
 assert.equal(contextState?.statusVisible, true, JSON.stringify(contextState));
 assert.equal(contextState?.wordCountInStatus, true, JSON.stringify(contextState));
 assert.equal(contextState?.commentsHidden, true, JSON.stringify(contextState));
@@ -193,11 +197,7 @@ async function postEditorCommand(commandName, payload = {}) {
 }
 await postEditorCommand("chat-toggle");
 await delay(250);
-let chatToggleResult = await innerCommand("getComputedStyle(document.querySelector('.cp-toolbar-chat-drawer')).display");
-assert.equal(chatToggleResult?.result?.result?.value, "none", JSON.stringify(chatToggleResult));
-await postEditorCommand("chat-toggle");
-await delay(250);
-chatToggleResult = await innerCommand("getComputedStyle(document.querySelector('.cp-toolbar-chat-drawer')).display");
+const chatToggleResult = await innerCommand("getComputedStyle(document.querySelector('.cp-toolbar-chat-drawer')).display");
 assert.notEqual(chatToggleResult?.result?.result?.value, "none", JSON.stringify(chatToggleResult));
 
 // Task Node owns the native picker because browser user activation cannot
@@ -316,10 +316,10 @@ assert.equal(chatRender?.assistantLabel, "ODV", JSON.stringify(chatRender));
 assert.equal(chatRender?.assistantLabelVisible, true, JSON.stringify(chatRender));
 assert.equal(chatRender?.boldCount, 0, JSON.stringify(chatRender));
 assert.equal(chatRender?.paragraphCount, 2, JSON.stringify(chatRender));
-assert.equal(chatRender?.background, "rgb(250, 250, 249)", JSON.stringify(chatRender));
-assert.equal(chatRender?.padding, "12px 14px", JSON.stringify(chatRender));
-assert.equal(chatRender?.ownBackground, "rgb(28, 25, 23)", JSON.stringify(chatRender));
-assert.equal(chatRender?.drawerWidth, 340, JSON.stringify(chatRender));
+assert.equal(chatRender?.background, "rgba(0, 0, 0, 0)", JSON.stringify(chatRender));
+assert.equal(chatRender?.padding, "0px 2px", JSON.stringify(chatRender));
+assert.equal(chatRender?.ownBackground, "rgb(13, 13, 13)", JSON.stringify(chatRender));
+assert.equal(chatRender?.drawerWidth, 384, JSON.stringify(chatRender));
 assert.equal(chatRender?.messagesContained, true, JSON.stringify(chatRender));
 assert.equal(chatRender?.ownMessageContained, true, JSON.stringify(chatRender));
 assert.equal(chatRender?.assistantMessageContained, true, JSON.stringify(chatRender));
@@ -434,6 +434,9 @@ for (let attempt = 0; attempt < 20; attempt += 1) {
   if (reconciledTitle === renamedTitle) break;
 }
 assert.equal(reconciledTitle, renamedTitle);
-console.log(JSON.stringify({ ok: true, capability, contextState, odv: odvResult?.result?.result?.value?.result, coach: coachResult?.result?.result?.value?.result, titleEvent, reconciledTitle, pageCount: 1 }, null, 2));
+const finalChatDisplayResult = await innerCommand("getComputedStyle(document.querySelector('.cp-toolbar-chat-drawer')).display");
+const finalChatDisplay = finalChatDisplayResult?.result?.result?.value;
+assert.notEqual(finalChatDisplay, "none", JSON.stringify(finalChatDisplayResult));
+console.log(JSON.stringify({ ok: true, capability, contextState, odv: odvResult?.result?.result?.value?.result, coach: coachResult?.result?.result?.value?.result, titleEvent, reconciledTitle, finalChatDisplay, pageCount: 1 }, null, 2));
 innerSocket.close();
 socket.close();

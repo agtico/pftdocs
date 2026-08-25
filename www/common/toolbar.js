@@ -618,8 +618,11 @@ MessengerUI, Messages, Pages, Icons) {
             visible = !visible;
             Common.setAttribute(['toolbar', 'chat-drawer'], visible);
         });
-        $(window).on('tasknode:document-context', function () {
-            if (config.metadataMgr.getPrivateData().app !== 'sheet') { show(); }
+        $(window).on('tasknode:document-context', function (event, state) {
+            if (config.metadataMgr.getPrivateData().app === 'sheet' || !state || !state.initial) { return; }
+            // Task Node renders the document-level Chat button outside this
+            // frame, so the embedded rail should never force itself open.
+            hide(true);
         });
         show();
         Common.getAttribute(['toolbar', 'chat-drawer'], function (err, val) {
