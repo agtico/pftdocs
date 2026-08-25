@@ -17,6 +17,7 @@ define([
         'form',
         'kanban',
         'pad',
+        'sheet',
         'slide',
         'whiteboard',
         'integration'

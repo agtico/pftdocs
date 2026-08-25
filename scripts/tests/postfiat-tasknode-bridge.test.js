@@ -67,6 +67,7 @@ test('Task Node bridge creates and reopens spreadsheets without changing documen
     const appConfigSource = fs.readFileSync(path.join(root, 'www/common/application_config_internal.js'), 'utf8');
     const flyDockerfile = fs.readFileSync(path.join(root, 'Dockerfile.fly'), 'utf8');
     assert.match(appConfigSource, /availablePadTypes = \['drive', 'pad', 'sheet'\]/);
+    assert.match(outerSource, /embeddableApps = \[[\s\S]*'pad',[\s\S]*'sheet',[\s\S]*'slide'/);
     assert.match(flyDockerfile, /install-onlyoffice\.sh --accept-license --no-rdfind/);
     assert.match(source, /params\.get\('documentType'\) === 'sheet' \? 'sheet' : 'pad'/);
     assert.match(source, /'\/' \+ documentType \+ '\/\?tasknodeBootstrap='/);
