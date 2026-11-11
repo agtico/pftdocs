@@ -56,6 +56,7 @@ Read these first:
 
 - `docs/postfiat/RESEARCH.md`
 - `docs/postfiat/ARCHITECTURE.md`
+- `docs/postfiat/SPREADSHEET_DATA_QUERIES.md`
 - `docs/postfiat/BURNDOWN.md`
 - `docs/postfiat/AGENT_HANDOFF.md`
 - `docs/postfiat/DEPLOYMENT.md`

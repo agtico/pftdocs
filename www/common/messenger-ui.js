@@ -12,7 +12,8 @@ define([
     '/common/hyperscript.js',
     '/common/diffMarked.js',
     '/common/common-icons.js',
-], function ($, Messages, Util, UI, UIElements, Badges, h, DiffMd, Icons) {
+    '/common/tasknode-chat-protocol.js',
+], function ($, Messages, Util, UI, UIElements, Badges, h, DiffMd, Icons, TaskNodeChat) {
     'use strict';
 
     var debug = console.log;
@@ -26,35 +27,8 @@ define([
     // orphan an active request or discard mentions queued behind it.
     var taskNodeAssistantStates = {};
 
-    var taskNodePersonaForMessage = function (value) {
-        var match = /(^|\s)@(ODV|coach)\b/i.exec(String(value || ''));
-        if (!match) { return; }
-        var persona = String(match[2] || '').toLowerCase();
-        return persona === 'coach' ? {
-            persona: 'coach', mention: '@coach', label: 'Trading Coach'
-        } : {
-            persona: 'odv', mention: '@ODV', label: 'ODV'
-        };
-    };
-
-    // Assistant replies are persisted in the encrypted chat with a mechanical
-    // routing header. Keep that metadata in the stored message, but do not
-    // render it as bold prose in the document-chat UI.
-    var taskNodeAssistantMessage = function (value) {
-        var text = String(value || '');
-        var match = /^\*\*@(ODV|coach) · (ODV|Trading Coach)(?: · GLM 5\.2 via Ambient)?\*\*\s*/i.exec(text);
-        if (!match) {
-            // Compatibility with the first Task Node ODV response format.
-            match = /^\*\*@ODV · GLM 5\.2 via Ambient\*\*\s*/i.exec(text);
-        }
-        if (!match) { return; }
-        var persona = /^coach$/i.test(match[1] || '') ? 'coach' : 'odv';
-        return {
-            body: text.slice(match[0].length).trim(),
-            label: persona === 'coach' ? 'Trading Coach' : 'ODV',
-            persona: persona
-        };
-    };
+    var taskNodePersonaForMessage = TaskNodeChat.mention;
+    var taskNodeAssistantMessage = TaskNodeChat.assistantMessage;
 
     var dataQuery = function (id) {
         return '[data-key="' + id + '"]';
@@ -397,7 +371,7 @@ define([
                 headerContent = [
                     h('div.cp-app-contacts-header-title', [
                         Icons.get('sparkles'),
-                        h('span.cp-tasknode-chat-title', Messages.contacts_padTitle)
+                        h('span.cp-tasknode-chat-title', window.CryptPad_taskNodeContext ? 'Document chat' : Messages.contacts_padTitle)
                     ]),
                     moreHistory,
                     collapseTaskNodeChat
@@ -534,7 +508,7 @@ define([
                         mention: '@coach', label: 'Trading Coach'
                     } : { mention: '@ODV', label: 'ODV' };
                     var response = '**' + responsePersona.mention + ' · ' + responsePersona.label +
-                        ' · GLM 5.2 via Ambient**\n\n' + String(result.response).slice(0, 12000);
+                        '**\n\n' + String(result.response);
                     execCommand('SEND_MESSAGE', { id: id, content: response }, function (responseErr) {
                         if (responseErr) {
                             UI.warn(responsePersona.mention +

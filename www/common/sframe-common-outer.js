@@ -9,7 +9,8 @@ define([
     '/common/requireconfig.js',
     '/customize/messages.js',
     'jquery',
-], function (nThen, ApiConfig, RequireConfig, Messages, $) {
+    '/common/tasknode-chat-protocol.js',
+], function (nThen, ApiConfig, RequireConfig, Messages, $, TaskNodeChat) {
     var common = {};
 
     var embeddableApps = [
@@ -903,10 +904,10 @@ define([
                 clearTimeout(pending.timeout);
                 pending.cb({
                     ok: data.ok === true,
-                    response: String(data.response || '').slice(0, 12000),
+                    response: String(data.response || ''),
                     persona: String(data.persona || pending.persona || 'odv').slice(0, 20),
                     label: String(data.label || pending.label || 'ODV').slice(0, 80),
-                    model: String(data.model || 'z-ai/glm-5.2').slice(0, 160),
+                    model: String(data.model || 'zai/glm-5.3').slice(0, 160),
                     error: String(data.error || '').slice(0, 500)
                 });
             };
@@ -918,8 +919,8 @@ define([
                     var persona = String(data && data.persona || '').trim().toLowerCase();
                     var prompt = String(data && data.prompt || '').trim().slice(0, 4000);
                     var documentContent = String(data && data.documentContent || '').trim().slice(0, 80000);
-                    var mentionMatches = persona === 'odv' ? /(^|\s)@ODV\b/i.test(prompt) :
-                        persona === 'coach' && /(^|\s)@coach\b/i.test(prompt);
+                    var requestedPersona = TaskNodeChat.mention(prompt);
+                    var mentionMatches = requestedPersona && requestedPersona.persona === persona;
                     if (!taskNodeContextAccepted || !taskNodeAssistantsEnabled || !target || !mentionMatches || !documentContent) {
                         return void cb({ ok: false, error: 'The mentioned Task Node assistant is unavailable.' });
                     }
@@ -930,7 +931,7 @@ define([
                         if (!pending) { return; }
                         delete pendingTaskNodeAssistants[assistantRequestId];
                         pending.cb({ ok: false, error: '@' + persona + ' timed out.' });
-                    }, 65000);
+                    }, TaskNodeChat.assistantTimeoutMs);
                     pendingTaskNodeAssistants[assistantRequestId] = {
                         cb: cb, timeout: timeout, persona: persona, label: label
                     };

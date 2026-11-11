@@ -100,11 +100,42 @@ OpenRouter requests from the Post Fiat AI settings should include `provider.zdr=
 
 The `/app/#chat` page uses the same browser-local provider keys. When a user enables Context Doc, Tasks, or named document references in the chat source popup, the decrypted selected text is assembled in the browser and sent directly to the chosen AI provider with the user's prompt. Chat transcripts and source selections are browser-local UI state; they are not CryptPad document E2E content and should be treated as local provider-facing data.
 
+## Spreadsheet Data Provider Key Notes
+
+Spreadsheet formulas such as `=CORBANU("msft us","px last")` and
+`=CORBANU("msft us","revenue","3Q 2024")`, along with provider-first
+compatibility formulas such as `=PFDATA("tiingo","V US Equity","PX_LAST")`,
+call the same-origin
+`/api/postfiat/data/query` endpoint. Configure Tiingo with the
+server-only `TIINGO_API_KEY` environment variable. The token must not be written
+to `config/config.js`, browser storage, spreadsheet content, or `/api/config`.
+See `docs/postfiat/SPREADSHEET_DATA_QUERIES.md` for the formula contract,
+supported fields, caching behavior, and provider-extension boundary.
+
 ## Operational Checklist
 
 - Configure Tor onion services or TLS and reverse proxy websocket traffic for `/cryptpad_websocket`.
 - Use distinct main and sandbox origins, even for onion services.
 - Set `logIP: false` unless there is a concrete legal requirement.
 - Configure PFT-operated or self-hosted Nostr relay defaults before enabling share-by-wallet-address for users.
+- Configure `TIINGO_API_KEY` and verify the account's display/redistribution entitlement before enabling spreadsheet market data for the intended audience.
 - Keep backups of `blob`, `block`, `data`, and `datastore`.
 - Publish the exact source for the running instance to satisfy AGPL obligations.
+
+## Task Node embedded Docs and spreadsheet chat
+
+Task Node owns the library unlock screen, encrypted folder organization, and the header's Chat / Full context controls. PFDocs provides the encrypted document and conversation. Both pad and sheet editors use `customize.dist/src/less2/include/tasknode-chat.less`; the spreadsheet composer must remain inside the editor viewport at mobile widths.
+
+Each editor publishes readiness after initialization, waiting for the outer `EV_TASKNODE_INNER_READY` handler. OnlyOffice publishes after its workbook loads; the rich-text framework publishes after its ready callbacks. The toolbar starts chat closed for every Task Node editor and ignores late preference reads after Task Node takes control.
+
+The shared `www/common/tasknode-chat-protocol.js` parses explicit assistant mentions and historical response labels without regex. Rich text uses visible document content; spreadsheet requests use a bounded read of A1:AN200 on up to eight sheets (maximum 80,000 characters), preserving row numbers and worksheet names. Task Node remains responsible for account authorization and Vercel inference with Ambient backup.
+
+Focused verification:
+
+```sh
+node --test scripts/tests/postfiat-tasknode-chat-protocol.test.js scripts/tests/postfiat-tasknode-bridge.test.js
+CDP_PORT=9349 DOC_TYPE=sheet node scripts/pfdocs-tasknode-chat-visual-smoke.mjs
+CDP_PORT=9349 DOC_TYPE=pad node scripts/pfdocs-tasknode-chat-visual-smoke.mjs
+```
+
+The browser checks require a fresh Chrome profile with remote debugging enabled. They create a private encrypted test document on the PFDocs service, overlay the local bridge/stylesheet sources in that browser, and simulate assistant responses. They do not deploy the sources or test live model inference. `SCREENSHOT_DIR` sets the evidence directory. Deploy the PFDocs main app alongside Task Node's folder migration and frontend changes; the sandbox proxies the main app's static source.

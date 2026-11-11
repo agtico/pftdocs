@@ -35,7 +35,8 @@ define([
     '/components/localforage/dist/localforage.min.js',
     '/common/hyperscript.js',
     '/common/extensions.js',
-    '/common/common-icons.js'
+    '/common/common-icons.js',
+    '/common/tasknode-chat-protocol.js'
 ], function (
     $,
     ApiConfig,
@@ -68,7 +69,8 @@ define([
     localForage,
     h,
     Ext,
-    Icons
+    Icons,
+    TaskNodeChat
 ) {
     // Chainpad Netflux Inner
     var funcs = {};
@@ -329,28 +331,16 @@ define([
         });
     };
 
+    var taskNodeDocumentTextProvider;
+    funcs.setTaskNodeDocumentTextProvider = function (provider) {
+        taskNodeDocumentTextProvider = typeof provider === 'function' ? provider : null;
+    };
     var taskNodeDocumentText = function () {
-        var raw = ctx.cpNfInner && ctx.cpNfInner.chainpad && ctx.cpNfInner.chainpad.getUserDoc();
-        var parsed;
-        try { parsed = JSON.parse(raw || 'null'); } catch (e) { return ''; }
-        var chunks = [];
-        var walk = function (node) {
-            if (chunks.join(' ').length >= 80000 || node === null || typeof(node) === 'undefined') { return; }
-            if (typeof(node) === 'string') {
-                var value = node.replace(/\s+/g, ' ').trim();
-                if (value) { chunks.push(value); }
-                return;
-            }
-            if (!Array.isArray(node)) { return; }
-            if (typeof(node[0]) === 'string' && Array.isArray(node[2])) {
-                node[2].forEach(walk);
-                if (/^(?:P|DIV|H[1-6]|LI|TR|BR)$/i.test(node[0])) { chunks.push('\n'); }
-                return;
-            }
-            node.forEach(walk);
-        };
-        walk(parsed);
-        return chunks.join(' ').replace(/\s*\n\s*/g, '\n').replace(/[ \t]+/g, ' ').trim().slice(0, 80000);
+        try {
+            if (taskNodeDocumentTextProvider) { return String(taskNodeDocumentTextProvider()).slice(0, 80000); }
+            var raw = ctx.cpNfInner && ctx.cpNfInner.chainpad && ctx.cpNfInner.chainpad.getUserDoc();
+            return TaskNodeChat.documentText(JSON.parse(raw || 'null'));
+        } catch (e) { return 'Document content is temporarily unavailable.'; }
     };
 
     funcs.requestTaskNodeAssistant = function (data, cb) {
@@ -367,9 +357,14 @@ define([
         }, function (err, result) {
             if (err) { return void cb(err); }
             cb(null, result);
-        });
+        }, { timeout: TaskNodeChat.assistantQueryTimeoutMs });
     };
     funcs.getTaskNodeDocumentText = taskNodeDocumentText;
+    funcs.notifyTaskNodeReady = function () {
+        ctx.sframeChan.whenReg('EV_TASKNODE_INNER_READY', function () {
+            ctx.sframeChan.event('EV_TASKNODE_INNER_READY');
+        });
+    };
     funcs.requestTaskNodeOdv = function (data, cb) {
         funcs.requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
     };
@@ -911,17 +906,14 @@ define([
                         ctx.metadataMgr.updateTitle(title);
                     }
                 }
-                if (privateData.app !== 'sheet') {
-                    // The Task Node Docs shell owns the chat trigger. Start each
-                    // document with a clean reading surface and let its Chat
-                    // button reveal the encrypted conversation rail on demand.
-                    if (firstTaskNodeContext) {
-                        funcs.setAttribute(['toolbar', 'chat-drawer'], false);
-                    }
-                    $(window).trigger('tasknode:document-context', {
-                        initial: firstTaskNodeContext
-                    });
+                // The Task Node Docs shell owns the chat trigger. Start each
+                // document with a clean reading surface, including spreadsheets.
+                if (firstTaskNodeContext) {
+                    funcs.setAttribute(['toolbar', 'chat-drawer'], false);
                 }
+                $(window).trigger('tasknode:document-context', {
+                    initial: firstTaskNodeContext
+                });
             });
             ctx.sframeChan.on('EV_TASKNODE_COMMAND', function (data) {
                 if (String(data && data.command || '') === 'set-title') {
@@ -941,7 +933,7 @@ define([
                 if (!selector) { return; }
                 $(selector).first().trigger('click');
             });
-            ctx.sframeChan.event('EV_TASKNODE_INNER_READY');
+
 
             ctx.sframeChan.whenReg('EV_CACHE_PUT', function () {
                 if (Object.keys(window.cryptpadCache.updated).length) {

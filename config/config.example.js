@@ -143,6 +143,21 @@ module.exports = {
             openRouterBaseUrl: 'https://openrouter.ai',
             runPodProxyOrigin: 'https://*.proxy.runpod.net',
         },
+        data: {
+            // Spreadsheet data-query providers are called by the PFDocs server;
+            // credentials such as TIINGO_API_KEY must remain environment secrets.
+            defaultProvider: 'tiingo',
+            tiingo: {
+                baseUrl: 'https://api.tiingo.com',
+                timeoutMs: 10 * 1000,
+                quoteCacheTtlMs: 15 * 1000,
+                quoteCacheStaleMs: 5 * 60 * 1000,
+                quoteCacheMaxEntries: 2048,
+                fundamentalCacheTtlMs: 15 * 60 * 1000,
+                fundamentalCacheStaleMs: 24 * 60 * 60 * 1000,
+                fundamentalCacheMaxEntries: 256,
+            },
+        },
     },
 
 /*  CryptPad will launch a child process for every core available

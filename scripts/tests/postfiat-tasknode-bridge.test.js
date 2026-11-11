@@ -16,7 +16,7 @@ const toolbarSource = fs.readFileSync(path.join(root, 'www/common/toolbar.js'), 
 const uiElementsSource = fs.readFileSync(path.join(root, 'www/common/common-ui-elements.js'), 'utf8');
 const messengerSource = fs.readFileSync(path.join(root, 'www/common/messenger-ui.js'), 'utf8');
 const messengerWorkerSource = fs.readFileSync(path.join(root, 'src/worker/modules/messenger.js'), 'utf8');
-const padStyleSource = fs.readFileSync(path.join(root, 'www/pad/app-pad.less'), 'utf8');
+const padStyleSource = fs.readFileSync(path.join(root, 'www/pad/app-pad.less'), 'utf8') + fs.readFileSync(path.join(root, 'customize.dist/src/less2/include/tasknode-chat.less'), 'utf8');
 const editorStyleSource = fs.readFileSync(path.join(root, 'customize.dist/ckeditor-contents.css'), 'utf8');
 
 test('Task Node bridge uses an exact configured opener origin', () => {
@@ -123,8 +123,9 @@ test('Task Node document context aligns titles and encrypted chat identity', () 
     assert.doesNotMatch(messengerWorkerSource, /PadTypes\.isAvailable\('contacts'\)/);
     assert.match(messengerWorkerSource, /OPEN_PAD_CHAT/);
     assert.match(commonSource, /cp-tasknode-document/);
-    assert.match(commonSource, /privateData\.app !== 'sheet'/);
-    assert.match(toolbarSource, /getPrivateData\(\)\.app === 'sheet'/);
+    assert.ok(!commonSource.includes("if (privateData.app !== 'sheet')"));
+    assert.ok(!toolbarSource.includes("getPrivateData().app === 'sheet'"));
+    assert.ok(toolbarSource.includes('if (taskNodeChatControlled || window.CryptPad_taskNodeContext) { return; }'));
     assert.match(outerSource, /isEmbed: parsed\.hashData && parsed\.hashData\.embed \|\| cfg\.integration \|\| Boolean\(taskNodeSession\)/);
     assert.match(outerSource, /taskNodeSession: taskNodeSession/);
     assert.match(padStyleSource, /&\.cp-tasknode-document/);
@@ -225,11 +226,11 @@ test('@ODV and @coach use the current decrypted document through one exact-origi
     assert.match(outerSource, /Q_TASKNODE_ODV_REQUEST/);
     assert.match(outerSource, /pfdocs\.tasknode\.assistant-request/);
     assert.match(outerSource, /tasknode\.pfdocs\.assistant-response/);
-    assert.match(messengerSource, /@\(ODV\|coach\)/);
+    assert.ok(messengerSource.includes('TaskNodeChat.mention'));
     assert.match(messengerSource, /data\.isPadChat \|\| liveChannel\.isPadChat/);
-    assert.match(messengerSource, /persona: 'coach'/);
+    assert.ok(fs.readFileSync(path.join(root, 'www/common/tasknode-chat-protocol.js'), 'utf8').includes("persona: 'coach'"));
     assert.match(messengerSource, /Trading Coach/);
-    assert.match(messengerSource, /GLM 5\.2 via Ambient/);
+    assert.ok(messengerSource.includes('TaskNodeChat.assistantMessage'));
 });
 
 test('Fly rollouts use a deployment-specific browser asset cache key', () => {
@@ -240,4 +241,14 @@ test('Fly rollouts use a deployment-specific browser asset cache key', () => {
 test('RequireJS cannot mutate the shared PFDocs API configuration', () => {
     assert.match(bootSource, /require\.config\(JSON\.parse\(JSON\.stringify\(Config\.requireConf\)\)\)/);
     assert.doesNotMatch(bootSource, /require\.config\(Config\.requireConf\)/);
+});
+
+
+test('editor readiness waits for the outer receiver and actual editor initialization', () => {
+    const onlyOfficeSource = fs.readFileSync(path.join(root, 'www/common/onlyoffice/inner.js'), 'utf8');
+    assert.ok(commonSource.includes("ctx.sframeChan.whenReg('EV_TASKNODE_INNER_READY'"));
+    assert.ok(frameworkSource.includes('common.notifyTaskNodeReady()'));
+    assert.ok(onlyOfficeSource.includes('common.notifyTaskNodeReady()'));
+    assert.ok(frameworkSource.indexOf('common.notifyTaskNodeReady()') > frameworkSource.indexOf('evOnReady.fire(newPad)'));
+    assert.ok(onlyOfficeSource.indexOf('common.notifyTaskNodeReady()') > onlyOfficeSource.indexOf('const onDocumentReady ='));
 });
