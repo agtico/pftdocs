@@ -82,3 +82,18 @@ body.cp-app-sheet, body.cp-app-doc, body.cp-app-presentation {
     }
 }
 
+
+@import (reference) "/customize/src/less2/include/tasknode-chat.less";
+body.cp-app-sheet.cp-tasknode-document {
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    #cp-toolbar, .cp-help-container, .cp-corner-container { display: none !important; }
+    #cp-app-oo-container { position: relative; min-width: 0; overflow: hidden; }
+    #cp-app-oo-editor { min-width: 0; }
+    #cp-app-oo-container {
+        .tasknode-chat_main();
+        .cp-toolbar-chat-drawer { order: 2; height: 100%; }
+        @media screen and (max-width: 1180px) {
+            .cp-toolbar-chat-drawer { top: 0; height: auto; }
+        }
+    }
+}

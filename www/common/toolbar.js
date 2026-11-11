@@ -618,15 +618,19 @@ MessengerUI, Messages, Pages, Icons) {
             visible = !visible;
             Common.setAttribute(['toolbar', 'chat-drawer'], visible);
         });
-        $(window).on('tasknode:document-context', function () {
-            show();
+        var taskNodeChatControlled = Boolean(config.metadataMgr.getPrivateData().taskNodeSession);
+        $(window).on('tasknode:document-context', function (event, state) {
+            if (!state || !state.initial) { return; }
+            // Task Node renders the document-level Chat button outside this
+            // frame, so the embedded rail should never force itself open.
+            taskNodeChatControlled = true;
+            hide(true);
         });
-        show();
+        if (taskNodeChatControlled) { hide(true); } else { show(); }
         Common.getAttribute(['toolbar', 'chat-drawer'], function (err, val) {
-            if (window.CryptPad_taskNodeContext) {
-                show();
-                return;
-            }
+            // A late preference read must not reopen or close a drawer the
+            // Task Node shell already controls (including a user's first click).
+            if (taskNodeChatControlled || window.CryptPad_taskNodeContext) { return; }
             if (!val || Util.isSmallScreen()) {
                 return void hide(val === false);
             }
