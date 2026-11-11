@@ -1,0 +1,8 @@
+{"at":"2026-11-11T20:39:01.004Z","stage":"start","origin":"https://tasknode-pfdocs.fly.dev","dependencies":{"chainpad":"5.3.1","chainpad-netflux":"1.3.1","chainpad-crypto":"0.3.0","netflux-websocket":"1.3.0"}}
+{"at":"2026-11-11T20:39:01.026Z","stage":"test_pad_selected","reused":false,"createdThisRun":true}
+{"at":"2026-11-11T20:39:02.327Z","stage":"node_initialized_test_pad"}
+{"at":"2026-11-11T20:39:03.097Z","stage":"node_reopened_persisted_text","text":"# Prompt spike\nSynthetic initial text.\n"}
+{"at":"2026-11-11T20:39:09.897Z","stage":"browser_error","name":"RuntimeError","message":"Aborted(CompileError: WebAssembly.instantiate(): Compiling or instantiating WebAssembly module violates the following Content Security policy directive because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive: \"script-src 'self' resource: [URL]). Build with -sASSERTIONS for more info."}
+{"at":"2026-11-11T20:39:13.787Z","stage":"browser_editor_present","text":""}
+{"at":"2026-11-11T20:39:13.898Z","stage":"browser_state","frames":["https://tasknode-pfdocs.fly.dev/code/","https://tasknode-pfdocs-sandbox.fly.dev/code/inner.html"]}
+{"at":"2026-11-11T20:39:59.102Z","stage":"FAIL","error":"TIMEOUT_BROWSER_INITIAL_READ","code":null}

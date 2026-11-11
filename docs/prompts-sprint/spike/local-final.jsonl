@@ -1,0 +1,11 @@
+{"at":"2026-11-11T20:41:29.303Z","stage":"start","origin":"http://localhost:3190","dependencies":{"chainpad":"5.3.1","chainpad-netflux":"1.3.1","chainpad-crypto":"0.3.0","netflux-websocket":"1.3.0"}}
+{"at":"2026-11-11T20:41:29.326Z","stage":"test_pad_selected","reused":false,"createdThisRun":true}
+{"at":"2026-11-11T20:41:29.663Z","stage":"node_initialized_test_pad"}
+{"at":"2026-11-11T20:41:29.706Z","stage":"node_reopened_persisted_text","text":"# Prompt spike\nSynthetic initial text.\n"}
+{"at":"2026-11-11T20:41:30.244Z","stage":"browser_error","name":"RuntimeError","message":"Aborted(CompileError: WebAssembly.instantiate(): Compiling or instantiating WebAssembly module violates the following Content Security policy directive because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive: \"script-src 'self' resource: [URL]). Build with -sASSERTIONS for more info."}
+{"at":"2026-11-11T20:41:31.399Z","stage":"browser_editor_present","text":"# Prompt spike\nSynthetic initial text.\n"}
+{"at":"2026-11-11T20:41:31.471Z","stage":"browser_read_initial","text":"# Prompt spike\nSynthetic initial text.\n"}
+{"at":"2026-11-11T20:41:31.765Z","stage":"browser_edit_received_by_node","text":"# Prompt spike\nBrowser authored text.\n"}
+{"at":"2026-11-11T20:41:31.788Z","stage":"node_read_current_from_edit_capability","text":"# Prompt spike\nBrowser authored text.\n"}
+{"at":"2026-11-11T20:41:32.043Z","stage":"node_edit_visible_in_browser","text":"# Prompt spike\nBrowser authored text.\nNode live edit.\n"}
+{"at":"2026-11-11T20:41:32.136Z","stage":"PASS","readFromEditCapability":true,"browserToNode":true,"nodeToBrowser":true,"testPadsCreated":1}
