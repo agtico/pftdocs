@@ -1,22 +1,21 @@
 {
-  "acceptedAt": "2026-11-11T21:23:50.532Z",
-  "runtime": {
-    "localMcpNode": "24.22.1",
-    "taskNodeContainers": "node:24",
-    "pfdocsNode": "20.20.2"
-  },
+  "round": 3,
+  "acceptanceRun": "artifacts/prompts/acceptance-1794433598353",
+  "environment": "Synthetic local Task Node Node 24 / Postgres + PFDocs recovered production source",
   "pfdocsBase": "79f8a2a98c124db88600cdc405c0707a041cc42e",
-  "productionRequestsInContinuation": false,
-  "localOnly": true,
-  "expected": {
-    "created": 2,
-    "versions": 2,
-    "activeSeconds": 2,
-    "encryptedHistoryRows": 7
-  },
+  "migrations": [
+    "160_prompt_documents.sql",
+    "161_prompt_devices.sql",
+    "162_prompt_history_erasure.sql"
+  ],
+  "tihExecution": false,
   "files": {
-    "acceptance.jsonl": "9d6c491d1707ba67fff467c4a17aec0505bb1a42e2fccb20e4b39be9691da372",
-    "history-rows.json": "576df07cc0cab885df2e0353c5e6f5fd3ec1befa12854778e534062e4b6de5c4",
-    "prompts-library.png": "96f2af8c0ca4eca90aa352e2dfb02275560cd78accfb4d71a6d3c48bdc5a1826"
+    "acceptance.jsonl": "f1cb8d8d11e3378d0e137c6ecf8fc8cbe92f1dde972845a82df89f5cf9e5d153",
+    "history-rows.json": "a2baf10388e26d3a81b1c593bcf1c691c1596454bc321f0650732f6598ff48a0",
+    "prompts-library.png": "cbe16cd1a4909c280e29121182a61fc5e1660a67555b0f8fa391981f9820fd67",
+    "prompt-editor.png": "122c3538849f2c25cb06954bba082732c0e17ebb3359cecf6dce713910829a47",
+    "agent-edit-visible.png": "690daf3dad8d7b247a86b559328375048dac01b0a9281efe23c14c2a8afd527c",
+    "version-timeline.png": "18eb03ed71864ae591cae45a66283c5e52c8764ec9524a915ef71e817157d28c",
+    "device-approval.png": "d98c0baa66e62f9825f798d86a67fd725bc901ac558ddf2ee2bd9f804e945b23"
   }
 }

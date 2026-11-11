@@ -25,3 +25,7 @@ The full production source supersedes the client-only baseline. It restores the 
 The local bidirectional Node/browser spike passed; the one production pad could be created and reopened by Node. Production's browser refused `code` because of the allowlist. That result is historical, not a reason to rerun production or block Phases 1–3.
 
 Raw output and screenshots remain in `spike/`. The four protocol dependencies, v2 capability encoding, signed code-document JSON shape, and SmartJSONTransformer must be revalidated during the separate CryptPad upgrade. No upgrade is included here.
+
+## Round 3 review
+
+The updated Task Node acceptance demonstrates authenticated local device pairing, live edits, the editor version timeline, ciphertext-only history, offline recovery from the encrypted UI export, revocation, and usable Docs during a stalled history request. Five screenshots and raw stages are in `acceptance/`; the paired Task Node PR contains the implementations, migration 162, deletion/installer regression evidence, and review-browser instructions. Only the prompt bridge test was reformatted here; the PFDocs runtime behavior and recovered source base remain the same. The local PFDocs server is intentionally left running at `http://localhost:3190` with sandbox `3191` and websocket `3193`. No paid TIH command was run.
