@@ -1,102 +1,27 @@
-# Task Node Prompts: Phase 0 gate
+# Task Node Prompts sprint
 
-The Node protocol works locally with the markdown app enabled, but the production
-browser gate is blocked. This branch contains a spike and evidence, not the prompt
-library/history/device implementation. Phases 1–3 must wait for this gate.
+Manager ruling (2026-11-11 20:45 UTC): **Phase 0 passed**. This branch is based on `production-client-baseline-20261111` (`f42d569`) and enables the markdown `code` app. No further production spike/pads or Fly deployment are authorized.
 
-## Results (2026-11-11)
+Phases 1–3 and the browser/local-MCP/Postgres acceptance are implemented in Task Node PR #386. This PFDocs branch adds prompt-specific code-pad routing, assistant suppression, input-activity events, and full editor snapshots over the existing exact-origin/channel/request bridge. Ordinary pad/sheet routes and sharing are unchanged.
 
-- PFDocs base: `206cacdc798df09ea7eaa0b6abd38e6aee4034c8` (remote main).
-- Required libraries: chainpad 5.3.1, chainpad-netflux 1.3.1,
-  chainpad-crypto 0.3.0, netflux-websocket 1.3.0.
-- Local: reads persisted text using an edit capability, sees a browser edit in
-  Node, reconnects and reads the latest text, edits in Node and observes that edit
-  in the same browser tab. The local customization enables `code`; unmodified
-  main disables it. No CSP bypass or browser response rewriting is used.
-- Production: Node creates and reopens exactly one synthetic `/code/` test pad.
-  The normal production browser displays “This application has been disabled.”
-  The public app configuration lists only `drive`, `pad`, and `sheet`.
-- Both browsers emit a WebAssembly CSP error. This did not prevent the successful
-  local code collaboration after enabling the app; it is not the proven blocker.
-- Two sampled production bridge files differ from main. See
-  `spike/production-provenance.json` and `spike/production-diff.patch`. The delta
-  includes assistant protocol handling, response budgets, document text extraction,
-  and Task Node embed/readiness/chat behavior. These public assets do not establish
-  the deployed server commit. Do not deploy this checkout over that unknown delta.
+## Local verification
 
-NEEDS-MANAGER: spike failed on the production browser because `/code/` is disabled.
-Enable the markdown app through the manager-reviewed production configuration and
-rerun Phase 0 before starting Phases 1–3. No deployment is performed by this sprint.
+Run `node --test scripts/tests/postfiat-prompts.test.js`. The local config at `spike/local-config.cjs` permits embedding by `http://localhost:3195`; the normal branch allowlist enables `code`, so the old local customization override is unnecessary.
 
-NEEDS-MANAGER: reconcile the production PFDocs source/build revision with repository
-main before reviewing changes against production.
-
-## Reproduce in a newly created checkout
-
-All commands below run from the isolated PFDocs checkout. The local service uses
-loopback ports 3190, 3191 and 3193. Check they are free first.
+Start from this checkout:
 
 ```sh
-npm ci --cache .npm --ignore-scripts --no-audit --no-fund
-npm run install:components
-mkdir -p artifacts/spike-browser
-printf '{"private":true}\n' > artifacts/spike-browser/package.json
-npm install --prefix artifacts/spike-browser --cache .npm --ignore-scripts --no-audit --no-fund playwright@1.65.0
-```
-
-Use an installed Chromium through `CHROMIUM_PATH` or install the matching browser
-under this checkout using Playwright's `PLAYWRIGHT_BROWSERS_PATH`. The recorded run
-used Chromium from `/home/postfiat/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome`.
-
-Create a **local-only** app customization. Stop if one already exists; do not
-replace another environment's settings.
-
-```sh
-mkdir -p customize
-node - <<'JS'
-const fs = require('node:fs');
-const input = fs.readFileSync('customize.dist/application_config.js', 'utf8');
-fs.writeFileSync('customize/application_config.js', input.replace(
-  '    return AppConfig;',
-  "    AppConfig.availablePadTypes = [...AppConfig.availablePadTypes, 'code'];\n    return AppConfig;"
-), { flag: 'wx' });
-JS
 CRYPTPAD_CONFIG="$PWD/docs/prompts-sprint/spike/local-config.cjs" DEV=1 node server.js
 ```
 
-In another terminal, in the same checkout:
+Use Task Node's `docs/prompts-sprint/README.md` and `scripts/prompts-local-acceptance.mjs` for the full isolated acceptance, including actual device sign-in/approval, all local prompt tools, browser-visible edits, encrypted versions/stats, ciphertext-only database rows, and revocation. Review evidence is in `acceptance/` in both PRs.
 
-```sh
-CHROMIUM_PATH=/path/to/chrome node scripts/prompts-headless-spike.cjs
-```
+## Recovered baseline limitation
 
-The script logs only synthetic text, stage results and redacted diagnostics. It
-uses an isolated browser context; it does not attach to existing browsers or tmux.
-Browser temporary files stay under this checkout's ignored `artifacts/` directory.
+The recovered baseline imports `/customize/src/less2/include/tasknode-chat.less`, absent from the checkout. Five older bridge tests fail on the baseline and this branch with identical names; see `acceptance/baseline-bridge-comparison.json`. The prompt-specific tests and local prompt acceptance pass. Manager provenance review must recover the ordinary-Docs stylesheet; this sprint does not replace ordinary Docs styling. Server `lib/` and built `src/` production provenance remain unverified, as stated by the manager.
 
-The production command creates **one** synthetic pad on its first invocation and
-reuses it on later runs. Its edit capability is kept in a mode-0600 ignored file
-under `artifacts/`; do not print or commit that file, and retain it for the rerun.
-No existing user pad is read or edited.
+## Historical Phase 0 evidence
 
-```sh
-PFDOCS_ORIGIN=https://tasknode-pfdocs.fly.dev CHROMIUM_PATH=/path/to/chrome \
-  node scripts/prompts-headless-spike.cjs
-```
+The local bidirectional Node/browser spike passed; the one production pad could be created and reopened by Node. Production's browser refused `code` because of the allowlist. That result is historical, not a reason to rerun production or block Phases 1–3.
 
-## Limits and next gate
-
-This does not demonstrate Task Node prompt creation, local MCP tools, device key
-approval, encrypted history, snapshots, stats, or the history database dump. The
-four required history/stats/device/assistant regression smokes belong to the
-blocked phases and have not been claimed as passing.
-
-For a future CryptPad 2026.10 upgrade, revalidate v2 capability parsing, the signed
-JSON code-document shape (`content`, `highlightMode`, `metadata`, `authormarks`),
-SmartJSONTransformer, and the four library versions. No upgrade was attempted.
-
-Raw results: [`local-final.jsonl`](spike/local-final.jsonl),
-[`production-run.jsonl`](spike/production-run.jsonl) (first attempt, one new pad),
-[`production-verified.jsonl`](spike/production-verified.jsonl) (same pad, explicit
-`BROWSER_APP_DISABLED`). Screenshots: [local](spike/local-browser.png),
-[production](spike/production-browser.png).
+Raw output and screenshots remain in `spike/`. The four protocol dependencies, v2 capability encoding, signed code-document JSON shape, and SmartJSONTransformer must be revalidated during the separate CryptPad upgrade. No upgrade is included here.

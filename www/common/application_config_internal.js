@@ -19,7 +19,7 @@ const factory = () => {
     // PFDocs is the focused encrypted document runtime behind Task Node. Keep
     // drive internally because CryptPad requires it, and expose only the
     // rich-text and spreadsheet editors used by Task Node.
-    AppConfig.availablePadTypes = ['drive', 'pad', 'sheet'];
+    AppConfig.availablePadTypes = ['drive', 'pad', 'sheet', 'code'];
 
     /* The registered only types are apps restricted to registered users.
      * You should never remove apps from this list unless you know what you're doing. The apps

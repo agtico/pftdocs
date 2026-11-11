@@ -884,6 +884,7 @@ define([
                 var firstTaskNodeContext = !window.CryptPad_taskNodeContext;
                 window.CryptPad_taskNodeContext = {
                     channelHash: String(data.channelHash || ''),
+                    prompt: data.prompt === true,
                     displayName: displayName,
                     odv: data.odv || {}
                 };

@@ -12,5 +12,6 @@ config.adminEmail = false;
 // Public test key only. Prevents printing a first-admin setup capability.
 config.adminKeys = [Buffer.alloc(32, 7).toString('base64')];
 config.enableEmbedding = true;
+config.permittedEmbedders = 'http://localhost:3191 http://localhost:3195';
 config.postFiat.taskNodeOrigins = ['http://localhost:3195'];
 module.exports = config;
