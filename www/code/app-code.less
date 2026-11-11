@@ -40,6 +40,49 @@
         font-size: initial;
         width: 100%;
     }
+
+    // Task Node prompt documents: a single prose writing surface.
+    &.cp-tasknode-prompt {
+        background-color: #fbfaf6;
+        #cp-app-code-preview, .cp-splitter, .cp-markdown-toolbar {
+            display: none !important;
+        }
+        #cp-app-code-container {
+            width: 100% !important;
+            max-width: 100%;
+            resize: none;
+            flex: 1;
+        }
+        .CodeMirror {
+            background-color: #fbfaf6;
+            color: #1c1917;
+            font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+            font-size: 15px !important;
+            line-height: 1.65;
+        }
+        .cm-variable-2, .cm-variable-3, .cm-keyword {
+            color: #1c1917;
+        }
+        .cm-quote, .cm-comment {
+            color: #57534e;
+        }
+        .cm-link, .cm-url {
+            color: #0f766e;
+        }
+        .CodeMirror-lines {
+            box-sizing: border-box;
+            margin: 0 auto;
+            max-width: 880px;
+            padding: 32px 28px 160px;
+        }
+        .CodeMirror-activeline-background {
+            background: transparent;
+        }
+        .cm-header {
+            color: #1c1917;
+            font-weight: 700;
+        }
+    }
     .CodeMirror-focused .cm-matchhighlight {
         background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQI12NgYGBgkKzc8x9CMDAwAAAmhwSbidEoSQAAAABJRU5ErkJggg==");
         background-position: bottom;

@@ -595,8 +595,24 @@ define([
 
         framework.setTitleRecommender(CodeMirror.getHeadingText);
 
+        // Task Node prompts are prose, not code: one wrapped, full-width
+        // writing column with markdown highlighting and no preview pane.
+        var applyPromptSurface = function () {
+            if (!$('body').hasClass('cp-tasknode-prompt')) { return; }
+            editor.setOption('lineWrapping', true);
+            editor.setOption('lineNumbers', false);
+            editor.setOption('foldGutter', false);
+            editor.setOption('gutters', []);
+            if (CodeMirror.highlightMode !== 'gfm') {
+                CodeMirror.setMode('gfm', evModeChange.fire);
+            }
+            editor.refresh();
+        };
+        $(window).on('cp-tasknode-context', applyPromptSurface);
+
         framework.onReady(function (newPad) {
             editor.focus();
+            applyPromptSurface();
 
             if (newPad && !CodeMirror.highlightMode) {
                 CodeMirror.setMode('gfm', evModeChange.fire);
