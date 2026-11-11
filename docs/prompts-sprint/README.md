@@ -1,6 +1,6 @@
 # Task Node Prompts sprint
 
-Manager ruling (2026-11-11 20:45 UTC): **Phase 0 passed**. This branch is based on `production-client-baseline-20261111` (`f42d569`) and enables the markdown `code` app. No further production spike/pads or Fly deployment are authorized.
+Manager ruling (2026-11-11 20:45 UTC): **Phase 0 passed**. This branch is based on `production-source-20260905` (`79f8a2a`), per the manager’s superseding 21:00 UTC note, and enables the markdown `code` app. No further production spike/pads or Fly deployment are authorized.
 
 Phases 1–3 and the browser/local-MCP/Postgres acceptance are implemented in Task Node PR #386. This PFDocs branch adds prompt-specific code-pad routing, assistant suppression, input-activity events, and full editor snapshots over the existing exact-origin/channel/request bridge. Ordinary pad/sheet routes and sharing are unchanged.
 
@@ -16,9 +16,9 @@ CRYPTPAD_CONFIG="$PWD/docs/prompts-sprint/spike/local-config.cjs" DEV=1 node ser
 
 Use Task Node's `docs/prompts-sprint/README.md` and `scripts/prompts-local-acceptance.mjs` for the full isolated acceptance, including actual device sign-in/approval, all local prompt tools, browser-visible edits, encrypted versions/stats, ciphertext-only database rows, and revocation. Review evidence is in `acceptance/` in both PRs.
 
-## Recovered baseline limitation
+## Recovered production source
 
-The recovered baseline imports `/customize/src/less2/include/tasknode-chat.less`, absent from the checkout. Five older bridge tests fail on the baseline and this branch with identical names; see `acceptance/baseline-bridge-comparison.json`. The prompt-specific tests and local prompt acceptance pass. Manager provenance review must recover the ordinary-Docs stylesheet; this sprint does not replace ordinary Docs styling. Server `lib/` and built `src/` production provenance remain unverified, as stated by the manager.
+The full production source supersedes the client-only baseline. It restores the ordinary-Docs stylesheet and bridge test expectations that were missing from the initial recovery. All 23 prompt, bridge, and chat protocol tests pass on this base. Run them with `node --test scripts/tests/postfiat-prompts.test.js scripts/tests/postfiat-tasknode-bridge.test.js scripts/tests/postfiat-tasknode-chat-protocol.test.js`. No production deployment or new production pad was used for this sprint continuation.
 
 ## Historical Phase 0 evidence
 
