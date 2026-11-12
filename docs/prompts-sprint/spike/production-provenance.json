@@ -1,0 +1,42 @@
+{
+  "checked_at": "2026-11-11T20:30:50.535453+00:00",
+  "main_commit": "206cacdc798df09ea7eaa0b6abd38e6aee4034c8",
+  "files": [
+    {
+      "path": "www/common/sframe-common-outer.js",
+      "status": 200,
+      "live_sha256": "317192066049a73c2a17456cba2fe2acf0300bf229f4dbb5e3d689ce6d2a4ea5",
+      "main_sha256": "4faa19ec74eabf0b433e9b911ca6f78099bedfe886fa4a0e438ec2ed699e0b0f",
+      "matches_main": false
+    },
+    {
+      "path": "www/common/sframe-common.js",
+      "status": 200,
+      "live_sha256": "6f0ef2812e8df0e0ee13651b73127f3a5bf9efca223c71ce18ba8776207e7530",
+      "main_sha256": "6bf78e0736ea44cfc70abe725fabbd3c434eb766aadf9d68c7cb27b2cca19320",
+      "matches_main": false
+    },
+    {
+      "path": "www/tasknode/main.js",
+      "status": 200,
+      "live_sha256": "651d0732132a36b26a63da1ab5108850cda938931906eeeb777cb620f232998a",
+      "main_sha256": "651d0732132a36b26a63da1ab5108850cda938931906eeeb777cb620f232998a",
+      "matches_main": true
+    },
+    {
+      "path": "www/code/inner.js",
+      "status": 200,
+      "live_sha256": "30dde310a64aceb0c2cbe466039efd3bc0d162ce38bb8b211a08c9cca0afa906",
+      "main_sha256": "30dde310a64aceb0c2cbe466039efd3bc0d162ce38bb8b211a08c9cca0afa906",
+      "matches_main": true
+    },
+    {
+      "path": "www/app/postfiat/tasknode-format.js",
+      "status": 200,
+      "live_sha256": "15d5c09aee63445a98f948f6a5b0d900f935569cf691f09490b1ea8f5eafcd05",
+      "main_sha256": "15d5c09aee63445a98f948f6a5b0d900f935569cf691f09490b1ea8f5eafcd05",
+      "matches_main": true
+    }
+  ],
+  "limitation": "Public asset comparison only; does not establish deployed server revision or build provenance."
+}

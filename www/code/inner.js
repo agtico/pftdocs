@@ -595,8 +595,24 @@ define([
 
         framework.setTitleRecommender(CodeMirror.getHeadingText);
 
+        // Task Node prompts are prose, not code: one wrapped, full-width
+        // writing column with markdown highlighting and no preview pane.
+        var applyPromptSurface = function () {
+            if (!$('body').hasClass('cp-tasknode-prompt')) { return; }
+            editor.setOption('lineWrapping', true);
+            editor.setOption('lineNumbers', false);
+            editor.setOption('foldGutter', false);
+            editor.setOption('gutters', []);
+            if (CodeMirror.highlightMode !== 'gfm') {
+                CodeMirror.setMode('gfm', evModeChange.fire);
+            }
+            editor.refresh();
+        };
+        $(window).on('cp-tasknode-context', applyPromptSurface);
+
         framework.onReady(function (newPad) {
             editor.focus();
+            applyPromptSurface();
 
             if (newPad && !CodeMirror.highlightMode) {
                 CodeMirror.setMode('gfm', evModeChange.fire);
@@ -655,7 +671,17 @@ define([
             };
         });
 
+        common.getSframeChannel().on('EV_TASKNODE_COMMAND', function (data) {
+            if (data && data.command === 'prompt-snapshot' && window.CryptPad_taskNodeContext && window.CryptPad_taskNodeContext.prompt) {
+                common.getSframeChannel().event('EV_TASKNODE_PROMPT_SNAPSHOT', { snapshotId: data.snapshotId, text: editor.getValue() });
+            }
+        });
+
         editor.on('change', function( cm, change ) {
+            if (window.CryptPad_taskNodeContext && window.CryptPad_taskNodeContext.prompt &&
+                    change.origin !== 'setValue' && change.origin !== 'remote' && !framework.isReadOnly()) {
+                common.getSframeChannel().event('EV_TASKNODE_PROMPT_ACTIVITY', {});
+            }
             markers.localChange(change, framework.localChange);
         });
 

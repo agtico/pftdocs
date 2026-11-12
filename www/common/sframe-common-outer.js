@@ -818,7 +818,7 @@ define([
                         data.requestId !== taskNodeBridge.requestId) { return; }
                 try {
                     var capabilityParsed = Utils.Hash.parsePadUrl(currentPad.href);
-                    var documentType = taskNodeBridge.documentType === 'sheet' ? 'sheet' : 'pad';
+                    var documentType = taskNodeBridge.prompt ? 'code' : taskNodeBridge.documentType === 'sheet' ? 'sheet' : 'pad';
                     var editHash = capabilityParsed && capabilityParsed.hash;
                     var viewHash = Utils.Hash.getViewHashFromKeys(secret);
                     var target = taskNodeTarget();
@@ -856,7 +856,7 @@ define([
                 if (data.requestId !== taskNodeBridge.requestId || data.channelHash !== secret.channel) { return; }
                 if (data.type === 'tasknode.pfdocs.context') {
                     taskNodeContextAccepted = true;
-                    taskNodeAssistantsEnabled = Boolean(data.odv && data.odv.enabled === true ||
+                    taskNodeAssistantsEnabled = !taskNodeBridge.prompt && Boolean(data.odv && data.odv.enabled === true ||
                         Array.isArray(data.agents) && data.agents.length);
                     var identity = data.identity || {};
                     var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
@@ -870,16 +870,18 @@ define([
                         title: String(data.title || '').trim().slice(0, 180),
                         documentOwned: data.documentOwned === true,
                         identity: identity,
-                        odv: data.odv || {},
-                        agents: Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
+                        prompt: taskNodeBridge.prompt === true,
+                        odv: taskNodeBridge.prompt ? { enabled: false } : data.odv || {},
+                        agents: taskNodeBridge.prompt ? [] : Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
                     });
                     return;
                 }
                 if (data.type === 'tasknode.pfdocs.command') {
                     if (!taskNodeContextAccepted) { return; }
                     var command = String(data.command || '');
-                    if (['import-content', 'export', 'history', 'chat-toggle', 'set-title'].indexOf(command) === -1) { return; }
-                    var commandData = { command: command };
+                    if (['import-content', 'export', 'history', 'chat-toggle', 'set-title', 'prompt-snapshot'].indexOf(command) === -1) { return; }
+                    if (command === 'prompt-snapshot' && !taskNodeBridge.prompt) { return; }
+                    var commandData = { command: command, snapshotId: data.snapshotId };
                     if (command === 'set-title') {
                         commandData.title = String(data.title || '').trim().slice(0, 180);
                         if (!commandData.title) { return; }
@@ -950,6 +952,18 @@ define([
                 sframeChan.on('Q_TASKNODE_ASSISTANT_REQUEST', requestTaskNodeAssistant);
                 sframeChan.on('Q_TASKNODE_ODV_REQUEST', function (data, cb) {
                     requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
+                });
+                ['SNAPSHOT', 'ACTIVITY'].forEach(function (kind) {
+                    sframeChan.on('EV_TASKNODE_PROMPT_' + kind, function (data) {
+                        var target = taskNodeTarget();
+                        if (!target || !taskNodeBridge.prompt || !taskNodeContextAccepted) { return; }
+                        target.postMessage({
+                            type: 'pfdocs.tasknode.prompt-' + kind.toLowerCase(),
+                            requestId: taskNodeBridge.requestId, channelHash: secret.channel,
+                            snapshotId: data && data.snapshotId,
+                            text: kind === 'SNAPSHOT' ? String(data && data.text || '') : undefined
+                        }, taskNodeBridge.returnOrigin);
+                    });
                 });
                 sframeChan.on('EV_TASKNODE_IMPORT_RESULT', function (data) {
                     var importTarget = taskNodeTarget();

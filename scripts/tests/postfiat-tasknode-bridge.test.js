@@ -67,7 +67,7 @@ test('Task Node bridge creates and reopens spreadsheets without changing documen
     const onlyOfficeSource = fs.readFileSync(path.join(root, 'www/common/onlyoffice/inner.js'), 'utf8');
     const appConfigSource = fs.readFileSync(path.join(root, 'www/common/application_config_internal.js'), 'utf8');
     const flyDockerfile = fs.readFileSync(path.join(root, 'Dockerfile.fly'), 'utf8');
-    assert.match(appConfigSource, /availablePadTypes = \['drive', 'pad', 'sheet'\]/);
+    assert.match(appConfigSource, /availablePadTypes = \['drive', 'pad', 'sheet', 'code'\]/);
     assert.match(outerSource, /embeddableApps = \[[\s\S]*'pad',[\s\S]*'sheet',[\s\S]*'slide'/);
     assert.match(flyDockerfile, /install-onlyoffice\.sh --accept-license --no-rdfind/);
     assert.match(source, /params\.get\('documentType'\) === 'sheet' \? 'sheet' : 'pad'/);
@@ -202,7 +202,7 @@ test('Task Node document chat contains narrow composers and unbroken message con
 test('Task Node editor commands stay on the validated exact-channel bridge', () => {
     assert.match(outerSource, /tasknode\.pfdocs\.command/);
     assert.match(outerSource, /taskNodeContextAccepted/);
-    assert.match(outerSource, /\['import-content', 'export', 'history', 'chat-toggle', 'set-title'\]/);
+    assert.match(outerSource, /\['import-content', 'export', 'history', 'chat-toggle', 'set-title', 'prompt-snapshot'\]/);
     assert.match(outerSource, /pfdocs\.tasknode\.import-result/);
     assert.match(commonSource, /EV_TASKNODE_COMMAND/);
     assert.match(commonSource, /metadataMgr\.updateTitle\(title\)/);

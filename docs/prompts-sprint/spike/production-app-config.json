@@ -1,0 +1,12 @@
+[
+  {
+    "url": "https://tasknode-pfdocs.fly.dev/common/application_config_internal.js",
+    "availablePadTypes_lines": [
+      "AppConfig.availablePadTypes = ['drive', 'pad', 'sheet'];"
+    ]
+  },
+  {
+    "url": "https://tasknode-pfdocs.fly.dev/customize/application_config.js",
+    "availablePadTypes_lines": []
+  }
+]

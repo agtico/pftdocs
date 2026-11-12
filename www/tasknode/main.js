@@ -13,7 +13,8 @@ define([
         try {
             var params = new URLSearchParams(window.location.search);
             var action = params.get('action');
-            var documentType = params.get('documentType') === 'sheet' ? 'sheet' : 'pad';
+            var isPrompt = params.get('documentType') === 'prompt';
+            var documentType = isPrompt ? 'code' : params.get('documentType') === 'sheet' ? 'sheet' : 'pad';
             var requestId = String(params.get('requestId') || '');
             var returnOrigin = new URL(String(params.get('returnOrigin') || '')).origin;
             var allowed = (ApiConfig.postFiat && ApiConfig.postFiat.taskNodeOrigins) || [];
@@ -37,6 +38,7 @@ define([
 
             sessionStorage.setItem('PFDocs_taskNodeBridge', JSON.stringify({
                 action: action,
+                prompt: isPrompt,
                 documentType: documentType,
                 requestId: requestId,
                 returnOrigin: returnOrigin,

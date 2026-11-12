@@ -1,0 +1,172 @@
+--- origin-main/www/common/sframe-common-outer.js
++++ production/www/common/sframe-common-outer.js
+@@ -9,7 +9,8 @@
+     '/common/requireconfig.js',
+     '/customize/messages.js',
+     'jquery',
+-], function (nThen, ApiConfig, RequireConfig, Messages, $) {
++    '/common/tasknode-chat-protocol.js',
++], function (nThen, ApiConfig, RequireConfig, Messages, $, TaskNodeChat) {
+     var common = {};
+ 
+     var embeddableApps = [
+@@ -903,10 +904,10 @@
+                 clearTimeout(pending.timeout);
+                 pending.cb({
+                     ok: data.ok === true,
+-                    response: String(data.response || '').slice(0, 12000),
++                    response: String(data.response || ''),
+                     persona: String(data.persona || pending.persona || 'odv').slice(0, 20),
+                     label: String(data.label || pending.label || 'ODV').slice(0, 80),
+-                    model: String(data.model || 'z-ai/glm-5.2').slice(0, 160),
++                    model: String(data.model || 'zai/glm-5.3').slice(0, 160),
+                     error: String(data.error || '').slice(0, 500)
+                 });
+             };
+@@ -918,8 +919,8 @@
+                     var persona = String(data && data.persona || '').trim().toLowerCase();
+                     var prompt = String(data && data.prompt || '').trim().slice(0, 4000);
+                     var documentContent = String(data && data.documentContent || '').trim().slice(0, 80000);
+-                    var mentionMatches = persona === 'odv' ? /(^|\s)@ODV\b/i.test(prompt) :
+-                        persona === 'coach' && /(^|\s)@coach\b/i.test(prompt);
++                    var requestedPersona = TaskNodeChat.mention(prompt);
++                    var mentionMatches = requestedPersona && requestedPersona.persona === persona;
+                     if (!taskNodeContextAccepted || !taskNodeAssistantsEnabled || !target || !mentionMatches || !documentContent) {
+                         return void cb({ ok: false, error: 'The mentioned Task Node assistant is unavailable.' });
+                     }
+@@ -930,7 +931,7 @@
+                         if (!pending) { return; }
+                         delete pendingTaskNodeAssistants[assistantRequestId];
+                         pending.cb({ ok: false, error: '@' + persona + ' timed out.' });
+-                    }, 65000);
++                    }, TaskNodeChat.assistantTimeoutMs);
+                     pendingTaskNodeAssistants[assistantRequestId] = {
+                         cb: cb, timeout: timeout, persona: persona, label: label
+                     };
+@@ -1399,7 +1400,7 @@
+                         feedbackAllowed: Utils.Feedback.state,
+                         prefersDriveRedirect: Utils.LocalStore.getDriveRedirectPreference(),
+                         isPresent: parsed.hashData && parsed.hashData.present,
+-                        isEmbed: parsed.hashData && parsed.hashData.embed || cfg.integration,
++                        isEmbed: parsed.hashData && parsed.hashData.embed || cfg.integration || Boolean(taskNodeSession),
+                         isTop: window.top === window,
+                         canEdit: Boolean(hashes && hashes.editHash),
+                         oldVersionHash: parsed.hashData && parsed.hashData.version < 2, // password
+@@ -1418,6 +1419,7 @@
+                         }) : undefined,
+                         fromContent: Cryptpad.fromContent,
+                         taskNodeBootstrap: Cryptpad.taskNodeBootstrap,
++                        taskNodeSession: taskNodeSession,
+                         burnAfterReading: burnAfterReading,
+                         storeInTeam: Cryptpad.initialTeam || (Cryptpad.initialPath ? -1 : undefined),
+                         supportsWasm: Utils.Util.supportsWasm(),
+--- origin-main/www/common/sframe-common.js
++++ production/www/common/sframe-common.js
+@@ -35,7 +35,8 @@
+     '/components/localforage/dist/localforage.min.js',
+     '/common/hyperscript.js',
+     '/common/extensions.js',
+-    '/common/common-icons.js'
++    '/common/common-icons.js',
++    '/common/tasknode-chat-protocol.js'
+ ], function (
+     $,
+     ApiConfig,
+@@ -68,7 +69,8 @@
+     localForage,
+     h,
+     Ext,
+-    Icons
++    Icons,
++    TaskNodeChat
+ ) {
+     // Chainpad Netflux Inner
+     var funcs = {};
+@@ -329,28 +331,16 @@
+         });
+     };
+ 
++    var taskNodeDocumentTextProvider;
++    funcs.setTaskNodeDocumentTextProvider = function (provider) {
++        taskNodeDocumentTextProvider = typeof provider === 'function' ? provider : null;
++    };
+     var taskNodeDocumentText = function () {
+-        var raw = ctx.cpNfInner && ctx.cpNfInner.chainpad && ctx.cpNfInner.chainpad.getUserDoc();
+-        var parsed;
+-        try { parsed = JSON.parse(raw || 'null'); } catch (e) { return ''; }
+-        var chunks = [];
+-        var walk = function (node) {
+-            if (chunks.join(' ').length >= 80000 || node === null || typeof(node) === 'undefined') { return; }
+-            if (typeof(node) === 'string') {
+-                var value = node.replace(/\s+/g, ' ').trim();
+-                if (value) { chunks.push(value); }
+-                return;
+-            }
+-            if (!Array.isArray(node)) { return; }
+-            if (typeof(node[0]) === 'string' && Array.isArray(node[2])) {
+-                node[2].forEach(walk);
+-                if (/^(?:P|DIV|H[1-6]|LI|TR|BR)$/i.test(node[0])) { chunks.push('\n'); }
+-                return;
+-            }
+-            node.forEach(walk);
+-        };
+-        walk(parsed);
+-        return chunks.join(' ').replace(/\s*\n\s*/g, '\n').replace(/[ \t]+/g, ' ').trim().slice(0, 80000);
++        try {
++            if (taskNodeDocumentTextProvider) { return String(taskNodeDocumentTextProvider()).slice(0, 80000); }
++            var raw = ctx.cpNfInner && ctx.cpNfInner.chainpad && ctx.cpNfInner.chainpad.getUserDoc();
++            return TaskNodeChat.documentText(JSON.parse(raw || 'null'));
++        } catch (e) { return 'Document content is temporarily unavailable.'; }
+     };
+ 
+     funcs.requestTaskNodeAssistant = function (data, cb) {
+@@ -367,9 +357,14 @@
+         }, function (err, result) {
+             if (err) { return void cb(err); }
+             cb(null, result);
+-        });
++        }, { timeout: TaskNodeChat.assistantQueryTimeoutMs });
+     };
+     funcs.getTaskNodeDocumentText = taskNodeDocumentText;
++    funcs.notifyTaskNodeReady = function () {
++        ctx.sframeChan.whenReg('EV_TASKNODE_INNER_READY', function () {
++            ctx.sframeChan.event('EV_TASKNODE_INNER_READY');
++        });
++    };
+     funcs.requestTaskNodeOdv = function (data, cb) {
+         funcs.requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
+     };
+@@ -886,6 +881,7 @@
+                 $('body').addClass('cp-tasknode-document');
+                 var identity = data.identity || {};
+                 var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
++                var firstTaskNodeContext = !window.CryptPad_taskNodeContext;
+                 window.CryptPad_taskNodeContext = {
+                     channelHash: String(data.channelHash || ''),
+                     displayName: displayName,
+@@ -910,8 +906,14 @@
+                         ctx.metadataMgr.updateTitle(title);
+                     }
+                 }
+-                funcs.setAttribute(['toolbar', 'chat-drawer'], true);
+-                $(window).trigger('tasknode:document-context');
++                // The Task Node Docs shell owns the chat trigger. Start each
++                // document with a clean reading surface, including spreadsheets.
++                if (firstTaskNodeContext) {
++                    funcs.setAttribute(['toolbar', 'chat-drawer'], false);
++                }
++                $(window).trigger('tasknode:document-context', {
++                    initial: firstTaskNodeContext
++                });
+             });
+             ctx.sframeChan.on('EV_TASKNODE_COMMAND', function (data) {
+                 if (String(data && data.command || '') === 'set-title') {
+@@ -931,7 +933,7 @@
+                 if (!selector) { return; }
+                 $(selector).first().trigger('click');
+             });
+-            ctx.sframeChan.event('EV_TASKNODE_INNER_READY');
++
+ 
+             ctx.sframeChan.whenReg('EV_CACHE_PUT', function () {
+                 if (Object.keys(window.cryptpadCache.updated).length) {

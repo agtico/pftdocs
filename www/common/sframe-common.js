@@ -879,14 +879,17 @@ define([
             ctx.sframeChan.on('EV_TASKNODE_CONTEXT', function (data) {
                 data = data || {};
                 $('body').addClass('cp-tasknode-document');
+                $('body').toggleClass('cp-tasknode-prompt', data.prompt === true);
                 var identity = data.identity || {};
                 var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
                 var firstTaskNodeContext = !window.CryptPad_taskNodeContext;
                 window.CryptPad_taskNodeContext = {
                     channelHash: String(data.channelHash || ''),
+                    prompt: data.prompt === true,
                     displayName: displayName,
                     odv: data.odv || {}
                 };
+                $(window).trigger('cp-tasknode-context');
                 var privateData = ctx.metadataMgr.getPrivateData();
                 var title = String(data.title || '').trim().slice(0, 180);
                 var current = ctx.metadataMgr.getMetadata();

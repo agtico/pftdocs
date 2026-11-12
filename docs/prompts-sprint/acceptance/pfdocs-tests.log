@@ -1,0 +1,125 @@
+TAP version 13
+# Subtest: prompt creation and reopen use code with prompt isolation preserved
+ok 1 - prompt creation and reopen use code with prompt isolation preserved
+  ---
+  duration_ms: 4.20306
+  ...
+# Subtest: ordinary pad and sheet routing remains unchanged
+ok 2 - ordinary pad and sheet routing remains unchanged
+  ---
+  duration_ms: 1.120612
+  ...
+# Subtest: prompt bridge suppresses assistants and authenticates snapshots and input activity
+ok 3 - prompt bridge suppresses assistants and authenticates snapshots and input activity
+  ---
+  duration_ms: 1.953703
+  ...
+# Subtest: Task Node bridge uses an exact configured opener origin
+ok 4 - Task Node bridge uses an exact configured opener origin
+  ---
+  duration_ms: 1.332059
+  ...
+# Subtest: Task Node bridge creates separate edit and view capabilities
+ok 5 - Task Node bridge creates separate edit and view capabilities
+  ---
+  duration_ms: 0.533933
+  ...
+# Subtest: Task Node bridge creates and reopens spreadsheets without changing document behavior
+ok 6 - Task Node bridge creates and reopens spreadsheets without changing document behavior
+  ---
+  duration_ms: 3.067645
+  ...
+# Subtest: configured Task Node origins are normalized to HTTP origins
+ok 7 - configured Task Node origins are normalized to HTTP origins
+  ---
+  duration_ms: 0.134602
+  ...
+# Subtest: Task Node document creation durably initializes the encrypted channel
+ok 8 - Task Node document creation durably initializes the encrypted channel
+  ---
+  duration_ms: 0.18025
+  ...
+# Subtest: Task Node document context aligns titles and encrypted chat identity
+ok 9 - Task Node document context aligns titles and encrypted chat identity
+  ---
+  duration_ms: 0.786732
+  ...
+# Subtest: Task Node editor chrome prioritizes controls and moves overflow without cloning actions
+ok 10 - Task Node editor chrome prioritizes controls and moves overflow without cloning actions
+  ---
+  duration_ms: 0.638258
+  ...
+# Subtest: Task Node document chat contains narrow composers and unbroken message content
+ok 11 - Task Node document chat contains narrow composers and unbroken message content
+  ---
+  duration_ms: 0.478949
+  ...
+# Subtest: Task Node editor commands stay on the validated exact-channel bridge
+ok 12 - Task Node editor commands stay on the validated exact-channel bridge
+  ---
+  duration_ms: 0.301462
+  ...
+# Subtest: Task Node pad skin remains compatible with the browser LESS compiler
+ok 13 - Task Node pad skin remains compatible with the browser LESS compiler
+  ---
+  duration_ms: 0.255193
+  ...
+# Subtest: @ODV and @coach use the current decrypted document through one exact-origin assistant bridge
+ok 14 - @ODV and @coach use the current decrypted document through one exact-origin assistant bridge
+  ---
+  duration_ms: 0.264487
+  ...
+# Subtest: Fly rollouts use a deployment-specific browser asset cache key
+ok 15 - Fly rollouts use a deployment-specific browser asset cache key
+  ---
+  duration_ms: 0.108673
+  ...
+# Subtest: RequireJS cannot mutate the shared PFDocs API configuration
+ok 16 - RequireJS cannot mutate the shared PFDocs API configuration
+  ---
+  duration_ms: 0.115433
+  ...
+# Subtest: editor readiness waits for the outer receiver and actual editor initialization
+ok 17 - editor readiness waits for the outer receiver and actual editor initialization
+  ---
+  duration_ms: 0.676656
+  ...
+# Subtest: explicit assistant mentions use protocol boundaries across paraphrases
+ok 18 - explicit assistant mentions use protocol boundaries across paraphrases
+  ---
+  duration_ms: 1.108224
+  ...
+# Subtest: assistant envelopes preserve body text and supported historical labels
+ok 19 - assistant envelopes preserve body text and supported historical labels
+  ---
+  duration_ms: 0.556966
+  ...
+# Subtest: rich text extracts visible content without attributes or metadata
+ok 20 - rich text extracts visible content without attributes or metadata
+  ---
+  duration_ms: 0.309385
+  ...
+# Subtest: spreadsheet chat snapshots preserve row numbers, zeroes, and bounded context
+ok 21 - spreadsheet chat snapshots preserve row numbers, zeroes, and bounded context
+  ---
+  duration_ms: 202.994173
+  ...
+# Subtest: chat protocol does not depend on regex
+ok 22 - chat protocol does not depend on regex
+  ---
+  duration_ms: 26.667346
+  ...
+# Subtest: large assistant answers retain their tail for both personas and have time to finish
+ok 23 - large assistant answers retain their tail for both personas and have time to finish
+  ---
+  duration_ms: 0.684207
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 317.986145
