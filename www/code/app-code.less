@@ -42,8 +42,9 @@
     }
 
     // Task Node prompt documents: a single prose writing surface.
+    // Colours are left to the editor's own light and dark themes: headings and list
+    // markers inherit the body text colour, so they stay readable in both.
     &.cp-tasknode-prompt {
-        background-color: #fbfaf6;
         #cp-app-code-preview, .cp-splitter, .cp-markdown-toolbar {
             display: none !important;
         }
@@ -54,20 +55,12 @@
             flex: 1;
         }
         .CodeMirror {
-            background-color: #fbfaf6;
-            color: #1c1917;
             font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
             font-size: 15px !important;
             line-height: 1.65;
         }
         .cm-variable-2, .cm-variable-3, .cm-keyword {
-            color: #1c1917;
-        }
-        .cm-quote, .cm-comment {
-            color: #57534e;
-        }
-        .cm-link, .cm-url {
-            color: #0f766e;
+            color: inherit;
         }
         .CodeMirror-lines {
             box-sizing: border-box;
@@ -79,7 +72,7 @@
             background: transparent;
         }
         .cm-header {
-            color: #1c1917;
+            color: inherit;
             font-weight: 700;
         }
     }
