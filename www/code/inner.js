@@ -599,10 +599,13 @@ define([
         // writing column with markdown highlighting and no preview pane.
         var applyPromptSurface = function () {
             if (!$('body').hasClass('cp-tasknode-prompt')) { return; }
+            // The chat rail follows the same light or dark theme as the editor.
+            $('body').toggleClass('cp-tasknode-prompt-dark', window.CryptPad_theme === 'dark');
             editor.setOption('lineWrapping', true);
-            editor.setOption('lineNumbers', false);
+            // Line numbers anchor the Prompt Assistant's references.
+            editor.setOption('lineNumbers', true);
             editor.setOption('foldGutter', false);
-            editor.setOption('gutters', []);
+            editor.setOption('gutters', ['CodeMirror-linenumbers']);
             if (CodeMirror.highlightMode !== 'gfm') {
                 CodeMirror.setMode('gfm', evModeChange.fire);
             }
@@ -672,7 +675,15 @@ define([
         });
 
         // The assistant reads the prompt source exactly as written in the editor.
-        common.setTaskNodeDocumentTextProvider(function () { return editor.getValue(); });
+        // In prompt mode every line carries its editor line number ("12| text")
+        // so the assistant can cite the lines the user sees in the gutter.
+        common.setTaskNodeDocumentTextProvider(function () {
+            var text = editor.getValue();
+            if (!(window.CryptPad_taskNodeContext && window.CryptPad_taskNodeContext.prompt)) { return text; }
+            return text.split('\n').map(function (line, index) {
+                return (index + 1) + '| ' + line;
+            }).join('\n');
+        });
 
         common.getSframeChannel().on('EV_TASKNODE_COMMAND', function (data) {
             if (data && data.command === 'prompt-snapshot' && window.CryptPad_taskNodeContext && window.CryptPad_taskNodeContext.prompt) {

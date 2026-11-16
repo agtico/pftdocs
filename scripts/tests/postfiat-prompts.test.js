@@ -70,7 +70,11 @@ test('prompt bridge offers only the announced prompt assistant and authenticates
     assert.match(inner, /EV_TASKNODE_PROMPT_ACTIVITY/);
     // The assistant receives the editor's markdown source, and the chat rail
     // uses the shared Task Node document styling in prompt mode.
-    assert.ok(inner.includes('common.setTaskNodeDocumentTextProvider(function () { return editor.getValue(); })'));
+    // The assistant gets numbered lines that match the gutter the user sees.
+    assert.ok(inner.includes("common.setTaskNodeDocumentTextProvider(function () {"));
+    assert.ok(inner.includes("return (index + 1) + '| ' + line;"));
+    assert.ok(inner.includes("editor.setOption('lineNumbers', true);"));
+    assert.ok(inner.includes("editor.setOption('gutters', ['CodeMirror-linenumbers']);"));
     const style = fs.readFileSync('www/code/app-code.less', 'utf8');
     const promptStyle = style.slice(style.indexOf('&.cp-tasknode-prompt {'));
     assert.ok(promptStyle.includes('.tasknode-chat_main();'));

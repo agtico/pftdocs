@@ -63,11 +63,24 @@
         .cm-variable-2, .cm-variable-3, .cm-keyword {
             color: inherit;
         }
+        // The numbered gutter sits directly beside the writing column.
+        .CodeMirror {
+            margin: 0 auto;
+            max-width: 960px;
+        }
         .CodeMirror-lines {
             box-sizing: border-box;
-            margin: 0 auto;
-            max-width: 880px;
-            padding: 32px 28px 160px;
+            padding: 32px 28px 160px 14px;
+        }
+        .CodeMirror-gutters {
+            background: transparent;
+            border-right: 0;
+        }
+        .CodeMirror-linenumber {
+            min-width: 28px;
+            padding: 0 6px 0 10px;
+            font-size: 12px;
+            opacity: 0.55;
         }
         .CodeMirror-activeline-background {
             background: transparent;
@@ -91,6 +104,85 @@
                 .cp-toolbar-chat-drawer {
                     top: 0;
                     height: auto;
+                }
+            }
+        }
+        // Dark theme: the rail matches the dark editor instead of staying light.
+        &.cp-tasknode-prompt-dark {
+            #cp-app-code-container {
+                background: #323232;
+            }
+            #cp-app-code-editor .cp-toolbar-chat-drawer {
+                border-left-color: #3f3f3f;
+                background: #262626;
+                color: #d6d3d1;
+                #cp-app-contacts-container, #cp-app-contacts-messaging {
+                    background: #262626;
+                    color: #d6d3d1;
+                }
+                .cp-app-contacts-header {
+                    border-bottom-color: #3f3f3f;
+                    background: #2b2b2b !important;
+                    color: #f5f5f4;
+                    .cp-app-contacts-header-title svg { color: #a8a29e; }
+                    .cp-app-contacts-more-history, .cp-tasknode-chat-collapse {
+                        color: #a8a29e;
+                        &:hover {
+                            background: #3a3a3a;
+                            color: #f5f5f4;
+                        }
+                    }
+                }
+                .cp-app-contacts-chat .cp-app-contacts-messages {
+                    background: #262626;
+                    scrollbar-color: #57534e transparent;
+                    &:empty::before { color: #8a877f; }
+                    .cp-app-contacts-message {
+                        color: #d6d3d1;
+                        .cp-app-contacts-sender {
+                            border-color: #4a4a4a;
+                            background: #333 !important;
+                            color: #c4c0b8;
+                        }
+                        .cp-app-contacts-content {
+                            color: #e7e5e4;
+                            pre, code {
+                                background: #1c1c1c;
+                                color: #e7e5e4;
+                            }
+                        }
+                        &.cp-tasknode-chat-own .cp-app-contacts-content {
+                            background: #f5f5f4;
+                            color: #1c1917;
+                        }
+                        &.cp-tasknode-chat-assistant {
+                            .cp-app-contacts-sender { color: #c4c0b8; }
+                            .cp-app-contacts-content {
+                                background: transparent;
+                                color: #e7e5e4;
+                            }
+                        }
+                    }
+                }
+                .cp-app-contacts-input {
+                    border-top-color: #3f3f3f;
+                    background: #2b2b2b !important;
+                    .cp-tasknode-chat-composer {
+                        border-color: #4a4a4a;
+                        background: #333;
+                        &:focus-within { border-color: #8a877f; }
+                    }
+                    textarea {
+                        color: #f5f5f4;
+                        &::placeholder { color: #8a877f; }
+                    }
+                    .cp-tasknode-chat-send {
+                        background: #f5f5f4;
+                        color: #1c1917;
+                        &:hover { background: #fff; }
+                    }
+                    .cp-tasknode-chat-note { color: #8a877f; }
+                    .cp-tasknode-chat-status { color: #c4c0b8; }
                 }
             }
         }
