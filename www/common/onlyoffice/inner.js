@@ -8,6 +8,7 @@ define([
     'json.sortify',
     '/components/nthen/index.js',
     '/common/sframe-common.js',
+    '/common/tasknode-chat-protocol.js',
     '/common/common-interface.js',
     '/common/common-hash.js',
     '/common/common-util.js',
@@ -28,6 +29,7 @@ define([
 
     '/common/onlyoffice/current-version.js',
     '/common/onlyoffice/broken-formats.js',
+    '/common/onlyoffice/data-query-formulas.js',
     '/common/common-icons.js',
     '/components/file-saver/FileSaver.min.js',
 
@@ -38,7 +40,7 @@ define([
     Toolbar,
     JSONSortify,
     nThen,
-    SFCommon,
+    SFCommon, TaskNodeChat,
     UI,
     Hash,
     Util,
@@ -58,6 +60,7 @@ define([
     Channel,
     OOCurrentVersion,
     BrokenFormats,
+    DataQueryFormulas,
     Icons)
 {
     var saveAs = window.saveAs;
@@ -143,6 +146,12 @@ define([
             if (!w) { return; }
             return w.editor || w.editorCell;
         };
+
+        if (privateData.app === 'sheet' && privateData.taskNodeSession) {
+            common.setTaskNodeDocumentTextProvider(function () {
+                return TaskNodeChat.spreadsheetText(getEditor());
+            });
+        }
 
         var setEditable = function (state, force) {
             $('#cp-app-oo-editor').find('#cp-app-oo-offline').remove();
@@ -2055,6 +2064,9 @@ define([
 
         const onDocumentReady = function(lock, lang, fromContent, file, force) {
             evOnSync.fire();
+            // The generic inner-ready event can precede outer bridge setup.
+            // Publish again when the actual workbook has finished loading.
+            if (privateData.taskNodeSession) { common.notifyTaskNodeReady(); }
             var onMigrateRdy = Util.mkEvent();
             onMigrateRdy.reg(function () {
                 var div = h('div.cp-oo-x2tXls', [
@@ -2199,6 +2211,15 @@ define([
             if (APP.initCheckpoint) {
                 getEditor().asc_setRestriction(true);
                 makeCheckpoint(true);
+            }
+
+            if (common.getMetadataMgr().getPrivateData().ooType === "sheet") {
+                var dataQueryRegistration = DataQueryFormulas.register(getEditor(), {
+                    endpoint: '/api/postfiat/data/query',
+                });
+                if (!dataQueryRegistration.ok) {
+                    console.error('PFDocs data-query formulas unavailable', dataQueryRegistration.error);
+                }
             }
 
             // Check if history can/should be trimmed

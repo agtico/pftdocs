@@ -9,7 +9,8 @@ define([
     '/common/requireconfig.js',
     '/customize/messages.js',
     'jquery',
-], function (nThen, ApiConfig, RequireConfig, Messages, $) {
+    '/common/tasknode-chat-protocol.js',
+], function (nThen, ApiConfig, RequireConfig, Messages, $, TaskNodeChat) {
     var common = {};
 
     var embeddableApps = [
@@ -817,7 +818,7 @@ define([
                         data.requestId !== taskNodeBridge.requestId) { return; }
                 try {
                     var capabilityParsed = Utils.Hash.parsePadUrl(currentPad.href);
-                    var documentType = taskNodeBridge.documentType === 'sheet' ? 'sheet' : 'pad';
+                    var documentType = taskNodeBridge.prompt ? 'code' : taskNodeBridge.documentType === 'sheet' ? 'sheet' : 'pad';
                     var editHash = capabilityParsed && capabilityParsed.hash;
                     var viewHash = Utils.Hash.getViewHashFromKeys(secret);
                     var target = taskNodeTarget();
@@ -855,7 +856,7 @@ define([
                 if (data.requestId !== taskNodeBridge.requestId || data.channelHash !== secret.channel) { return; }
                 if (data.type === 'tasknode.pfdocs.context') {
                     taskNodeContextAccepted = true;
-                    taskNodeAssistantsEnabled = Boolean(data.odv && data.odv.enabled === true ||
+                    taskNodeAssistantsEnabled = !taskNodeBridge.prompt && Boolean(data.odv && data.odv.enabled === true ||
                         Array.isArray(data.agents) && data.agents.length);
                     var identity = data.identity || {};
                     var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
@@ -869,16 +870,18 @@ define([
                         title: String(data.title || '').trim().slice(0, 180),
                         documentOwned: data.documentOwned === true,
                         identity: identity,
-                        odv: data.odv || {},
-                        agents: Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
+                        prompt: taskNodeBridge.prompt === true,
+                        odv: taskNodeBridge.prompt ? { enabled: false } : data.odv || {},
+                        agents: taskNodeBridge.prompt ? [] : Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
                     });
                     return;
                 }
                 if (data.type === 'tasknode.pfdocs.command') {
                     if (!taskNodeContextAccepted) { return; }
                     var command = String(data.command || '');
-                    if (['import-content', 'export', 'history', 'chat-toggle', 'set-title'].indexOf(command) === -1) { return; }
-                    var commandData = { command: command };
+                    if (['import-content', 'export', 'history', 'chat-toggle', 'set-title', 'prompt-snapshot'].indexOf(command) === -1) { return; }
+                    if (command === 'prompt-snapshot' && !taskNodeBridge.prompt) { return; }
+                    var commandData = { command: command, snapshotId: data.snapshotId };
                     if (command === 'set-title') {
                         commandData.title = String(data.title || '').trim().slice(0, 180);
                         if (!commandData.title) { return; }
@@ -903,10 +906,10 @@ define([
                 clearTimeout(pending.timeout);
                 pending.cb({
                     ok: data.ok === true,
-                    response: String(data.response || '').slice(0, 12000),
+                    response: String(data.response || ''),
                     persona: String(data.persona || pending.persona || 'odv').slice(0, 20),
                     label: String(data.label || pending.label || 'ODV').slice(0, 80),
-                    model: String(data.model || 'z-ai/glm-5.2').slice(0, 160),
+                    model: String(data.model || 'zai/glm-5.3').slice(0, 160),
                     error: String(data.error || '').slice(0, 500)
                 });
             };
@@ -918,8 +921,8 @@ define([
                     var persona = String(data && data.persona || '').trim().toLowerCase();
                     var prompt = String(data && data.prompt || '').trim().slice(0, 4000);
                     var documentContent = String(data && data.documentContent || '').trim().slice(0, 80000);
-                    var mentionMatches = persona === 'odv' ? /(^|\s)@ODV\b/i.test(prompt) :
-                        persona === 'coach' && /(^|\s)@coach\b/i.test(prompt);
+                    var requestedPersona = TaskNodeChat.mention(prompt);
+                    var mentionMatches = requestedPersona && requestedPersona.persona === persona;
                     if (!taskNodeContextAccepted || !taskNodeAssistantsEnabled || !target || !mentionMatches || !documentContent) {
                         return void cb({ ok: false, error: 'The mentioned Task Node assistant is unavailable.' });
                     }
@@ -930,7 +933,7 @@ define([
                         if (!pending) { return; }
                         delete pendingTaskNodeAssistants[assistantRequestId];
                         pending.cb({ ok: false, error: '@' + persona + ' timed out.' });
-                    }, 65000);
+                    }, TaskNodeChat.assistantTimeoutMs);
                     pendingTaskNodeAssistants[assistantRequestId] = {
                         cb: cb, timeout: timeout, persona: persona, label: label
                     };
@@ -949,6 +952,18 @@ define([
                 sframeChan.on('Q_TASKNODE_ASSISTANT_REQUEST', requestTaskNodeAssistant);
                 sframeChan.on('Q_TASKNODE_ODV_REQUEST', function (data, cb) {
                     requestTaskNodeAssistant($.extend({}, data, { persona: 'odv' }), cb);
+                });
+                ['SNAPSHOT', 'ACTIVITY'].forEach(function (kind) {
+                    sframeChan.on('EV_TASKNODE_PROMPT_' + kind, function (data) {
+                        var target = taskNodeTarget();
+                        if (!target || !taskNodeBridge.prompt || !taskNodeContextAccepted) { return; }
+                        target.postMessage({
+                            type: 'pfdocs.tasknode.prompt-' + kind.toLowerCase(),
+                            requestId: taskNodeBridge.requestId, channelHash: secret.channel,
+                            snapshotId: data && data.snapshotId,
+                            text: kind === 'SNAPSHOT' ? String(data && data.text || '') : undefined
+                        }, taskNodeBridge.returnOrigin);
+                    });
                 });
                 sframeChan.on('EV_TASKNODE_IMPORT_RESULT', function (data) {
                     var importTarget = taskNodeTarget();

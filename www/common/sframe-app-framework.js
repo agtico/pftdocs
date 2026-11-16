@@ -614,6 +614,9 @@ define([
                     onLocal();
                 }
                 evOnReady.fire(newPad);
+                if (common.getMetadataMgr().getPrivateData().taskNodeSession) {
+                    common.notifyTaskNodeReady();
+                }
 
                 // In forms, only editors can see the chat
                 if (!readOnly || type !== 'form') { common.openPadChat(onLocal); }

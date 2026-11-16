@@ -40,6 +40,42 @@
         font-size: initial;
         width: 100%;
     }
+
+    // Task Node prompt documents: a single prose writing surface.
+    // Colours are left to the editor's own light and dark themes: headings and list
+    // markers inherit the body text colour, so they stay readable in both.
+    &.cp-tasknode-prompt {
+        #cp-app-code-preview, .cp-splitter, .cp-markdown-toolbar {
+            display: none !important;
+        }
+        #cp-app-code-container {
+            width: 100% !important;
+            max-width: 100%;
+            resize: none;
+            flex: 1;
+        }
+        .CodeMirror {
+            font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+            font-size: 15px !important;
+            line-height: 1.65;
+        }
+        .cm-variable-2, .cm-variable-3, .cm-keyword {
+            color: inherit;
+        }
+        .CodeMirror-lines {
+            box-sizing: border-box;
+            margin: 0 auto;
+            max-width: 880px;
+            padding: 32px 28px 160px;
+        }
+        .CodeMirror-activeline-background {
+            background: transparent;
+        }
+        .cm-header {
+            color: inherit;
+            font-weight: 700;
+        }
+    }
     .CodeMirror-focused .cm-matchhighlight {
         background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQI12NgYGBgkKzc8x9CMDAwAAAmhwSbidEoSQAAAABJRU5ErkJggg==");
         background-position: bottom;

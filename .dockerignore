@@ -15,6 +15,7 @@
 docker-compose.yml
 Dockerfile*
 node_modules
+*.seed
 *.png
 *.md
 /onlyoffice-builds.git/
