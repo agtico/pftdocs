@@ -812,6 +812,7 @@ define([
             var taskNodeCapabilityPublished = false;
             var taskNodeContextAccepted = false;
             var taskNodeAssistantsEnabled = false;
+            var taskNodeAgents = [];
             var pendingTaskNodeAssistants = {};
             var publishTaskNodeCapability = function (data) {
                 if (taskNodeCapabilityPublished || !taskNodeBridge || taskNodeBridge.action !== 'create' || !data ||
@@ -856,8 +857,8 @@ define([
                 if (data.requestId !== taskNodeBridge.requestId || data.channelHash !== secret.channel) { return; }
                 if (data.type === 'tasknode.pfdocs.context') {
                     taskNodeContextAccepted = true;
-                    taskNodeAssistantsEnabled = !taskNodeBridge.prompt && Boolean(data.odv && data.odv.enabled === true ||
-                        Array.isArray(data.agents) && data.agents.length);
+                    taskNodeAgents = TaskNodeChat.agents(data, taskNodeBridge.prompt === true);
+                    taskNodeAssistantsEnabled = taskNodeAgents.length > 0;
                     var identity = data.identity || {};
                     var displayName = String(identity.displayName || identity.walletAddress || '').trim().slice(0, 120);
                     if (displayName) {
@@ -872,7 +873,7 @@ define([
                         identity: identity,
                         prompt: taskNodeBridge.prompt === true,
                         odv: taskNodeBridge.prompt ? { enabled: false } : data.odv || {},
-                        agents: taskNodeBridge.prompt ? [] : Array.isArray(data.agents) ? data.agents.slice(0, 8) : []
+                        agents: taskNodeAgents
                     });
                     return;
                 }
@@ -907,8 +908,8 @@ define([
                 pending.cb({
                     ok: data.ok === true,
                     response: String(data.response || ''),
-                    persona: String(data.persona || pending.persona || 'odv').slice(0, 20),
-                    label: String(data.label || pending.label || 'ODV').slice(0, 80),
+                    persona: String(data.persona || pending.persona).slice(0, 20),
+                    label: String(data.label || pending.label).slice(0, 80),
                     model: String(data.model || 'zai/glm-5.3').slice(0, 160),
                     error: String(data.error || '').slice(0, 500)
                 });
@@ -921,13 +922,13 @@ define([
                     var persona = String(data && data.persona || '').trim().toLowerCase();
                     var prompt = String(data && data.prompt || '').trim().slice(0, 4000);
                     var documentContent = String(data && data.documentContent || '').trim().slice(0, 80000);
-                    var requestedPersona = TaskNodeChat.mention(prompt);
+                    var requestedPersona = TaskNodeChat.mention(prompt, taskNodeAgents);
                     var mentionMatches = requestedPersona && requestedPersona.persona === persona;
                     if (!taskNodeContextAccepted || !taskNodeAssistantsEnabled || !target || !mentionMatches || !documentContent) {
                         return void cb({ ok: false, error: 'The mentioned Task Node assistant is unavailable.' });
                     }
                     var assistantRequestId = Utils.Util.uid();
-                    var label = persona === 'coach' ? 'Trading Coach' : 'ODV';
+                    var label = requestedPersona.label;
                     var timeout = setTimeout(function () {
                         var pending = pendingTaskNodeAssistants[assistantRequestId];
                         if (!pending) { return; }

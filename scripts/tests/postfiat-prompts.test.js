@@ -55,15 +55,26 @@ test('ordinary pad and sheet routing remains unchanged', () => {
         assert.equal(result.stored.prompt, false);
     }
 });
-test('prompt bridge suppresses assistants and authenticates snapshots and input activity', () => {
+test('prompt bridge offers only the announced prompt assistant and authenticates snapshots and input activity', () => {
     const outer = fs.readFileSync('www/common/sframe-common-outer.js', 'utf8');
-    assert.match(outer, /taskNodeAssistantsEnabled = !taskNodeBridge.prompt && Boolean/);
+    assert.ok(outer.includes('taskNodeAgents = TaskNodeChat.agents(data, taskNodeBridge.prompt === true)'));
+    assert.ok(outer.includes('taskNodeAssistantsEnabled = taskNodeAgents.length > 0'));
+    assert.ok(outer.includes('agents: taskNodeAgents'));
+    assert.ok(outer.includes("odv: taskNodeBridge.prompt ? { enabled: false } : data.odv || {}"));
+    assert.ok(outer.includes('TaskNodeChat.mention(prompt, taskNodeAgents)'));
     assert.match(outer, /event.source !== target \|\| event.origin !== taskNodeBridge.returnOrigin/);
     assert.match(outer, /data.requestId !== taskNodeBridge.requestId \|\| data.channelHash !== secret.channel/);
     assert.match(outer, /!target \|\| !taskNodeBridge.prompt \|\| !taskNodeContextAccepted/);
     const inner = fs.readFileSync('www/code/inner.js', 'utf8');
     assert.match(inner, /change.origin !== 'setValue'/);
     assert.match(inner, /EV_TASKNODE_PROMPT_ACTIVITY/);
+    // The assistant receives the editor's markdown source, and the chat rail
+    // uses the shared Task Node document styling in prompt mode.
+    assert.ok(inner.includes('common.setTaskNodeDocumentTextProvider(function () { return editor.getValue(); })'));
+    const style = fs.readFileSync('www/code/app-code.less', 'utf8');
+    const promptStyle = style.slice(style.indexOf('&.cp-tasknode-prompt {'));
+    assert.ok(promptStyle.includes('.tasknode-chat_main();'));
+    assert.ok(!promptStyle.includes('.cp-toolbar-chat-drawer { display: none'));
     assert.match(
         fs.readFileSync('www/common/application_config_internal.js', 'utf8'),
         /availablePadTypes = \['drive', 'pad', 'sheet', 'code'\]/,

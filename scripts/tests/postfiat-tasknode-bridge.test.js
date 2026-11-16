@@ -228,8 +228,20 @@ test('@ODV and @coach use the current decrypted document through one exact-origi
     assert.match(outerSource, /tasknode\.pfdocs\.assistant-response/);
     assert.ok(messengerSource.includes('TaskNodeChat.mention'));
     assert.match(messengerSource, /data\.isPadChat \|\| liveChannel\.isPadChat/);
-    assert.ok(fs.readFileSync(path.join(root, 'www/common/tasknode-chat-protocol.js'), 'utf8').includes("persona: 'coach'"));
-    assert.match(messengerSource, /Trading Coach/);
+    const protocolSource = fs.readFileSync(path.join(root, 'www/common/tasknode-chat-protocol.js'), 'utf8');
+    assert.ok(protocolSource.includes("persona: 'coach'"));
+    assert.ok(protocolSource.includes('Trading Coach'));
+    // Personas and labels come from the announced agent list, not from
+    // two-way coach/ODV fallbacks in the bridge or the chat UI.
+    assert.ok(outerSource.includes('taskNodeAgents = TaskNodeChat.agents(data, taskNodeBridge.prompt === true)'));
+    assert.ok(outerSource.includes('TaskNodeChat.mention(prompt, taskNodeAgents)'));
+    assert.ok(commonSource.includes("agents: TaskNodeChat.agents(data, data.prompt === true)"));
+    assert.ok(messengerSource.includes('TaskNodeChat.mention(value, taskNodeAgents())'));
+    assert.ok(messengerSource.includes('TaskNodeChat.persona(result.persona) || request.persona'));
+    for (const source of [outerSource, messengerSource]) {
+        assert.ok(!source.includes("'Trading Coach'"));
+        assert.ok(!source.includes("=== 'coach'"));
+    }
     assert.ok(messengerSource.includes('TaskNodeChat.assistantMessage'));
 });
 

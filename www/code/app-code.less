@@ -7,6 +7,7 @@
 @import (reference) "../../customize/src/less2/include/browser.less";
 @import (reference) "../../customize/src/less2/include/markdown.less";
 @import (reference) "../../customize/src/less2/include/framework.less";
+@import (reference) "/customize/src/less2/include/tasknode-chat.less";
 
 &.cp-app-code {
     .framework_main(
@@ -74,6 +75,24 @@
         .cm-header {
             color: inherit;
             font-weight: 700;
+        }
+        // The same conversation rail as Task Node documents and spreadsheets.
+        #cp-app-code-editor {
+            position: relative;
+            .tasknode-chat_main();
+            .cp-toolbar-chat-drawer {
+                order: 2;
+                height: 100%;
+            }
+            .cp-toolbar-chat-drawer .cp-app-contacts-chat .cp-app-contacts-messages:empty::before {
+                content: 'Start a conversation about this prompt. Mention @prompt when you want an assistant reply.';
+            }
+            @media screen and (max-width: 1180px) {
+                .cp-toolbar-chat-drawer {
+                    top: 0;
+                    height: auto;
+                }
+            }
         }
     }
     .CodeMirror-focused .cm-matchhighlight {

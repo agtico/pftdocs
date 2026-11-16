@@ -671,6 +671,9 @@ define([
             };
         });
 
+        // The assistant reads the prompt source exactly as written in the editor.
+        common.setTaskNodeDocumentTextProvider(function () { return editor.getValue(); });
+
         common.getSframeChannel().on('EV_TASKNODE_COMMAND', function (data) {
             if (data && data.command === 'prompt-snapshot' && window.CryptPad_taskNodeContext && window.CryptPad_taskNodeContext.prompt) {
                 common.getSframeChannel().event('EV_TASKNODE_PROMPT_SNAPSHOT', { snapshotId: data.snapshotId, text: editor.getValue() });

@@ -887,7 +887,8 @@ define([
                     channelHash: String(data.channelHash || ''),
                     prompt: data.prompt === true,
                     displayName: displayName,
-                    odv: data.odv || {}
+                    odv: data.odv || {},
+                    agents: TaskNodeChat.agents(data, data.prompt === true)
                 };
                 $(window).trigger('cp-tasknode-context');
                 var privateData = ctx.metadataMgr.getPrivateData();
