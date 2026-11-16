@@ -27,7 +27,19 @@ define([
     // orphan an active request or discard mentions queued behind it.
     var taskNodeAssistantStates = {};
 
-    var taskNodePersonaForMessage = TaskNodeChat.mention;
+    // Only assistants Task Node announced for this document can be mentioned.
+    var taskNodeAgents = function () {
+        return window.CryptPad_taskNodeContext ? window.CryptPad_taskNodeContext.agents : undefined;
+    };
+    var taskNodePersonaForMessage = function (value) {
+        return TaskNodeChat.mention(value, taskNodeAgents());
+    };
+    var taskNodeChatNoteText = function () {
+        var agents = taskNodeAgents();
+        if (!Array.isArray(agents) || !agents.length) { return 'Mention @ODV or @coach for a document-aware reply.'; }
+        return 'Mention ' + agents.map(function (agent) { return agent.mention; }).join(' or ') +
+            ' for a document-aware reply.';
+    };
     var taskNodeAssistantMessage = TaskNodeChat.assistantMessage;
 
     var dataQuery = function (id) {
@@ -378,8 +390,10 @@ define([
                 ];
             }
             var header = h('div.cp-app-contacts-header', headerContent);
+            var taskNodeChatNote = h('p.cp-tasknode-chat-note', taskNodeChatNoteText());
             $(window).on('tasknode:document-context', function () {
                 $(header).find('.cp-tasknode-chat-title').text('Document chat');
+                $(taskNodeChatNote).text(taskNodeChatNoteText());
             });
 
             var priv = metadataMgr.getPrivateData();
@@ -409,8 +423,6 @@ define([
                 'aria-live': 'polite',
                 'data-tasknode-assistant-state': 'idle'
             });
-            var taskNodeChatNote = h('p.cp-tasknode-chat-note',
-                'Mention @ODV or @coach for a document-aware reply.');
             $(input).on('input', function () {
                 input.style.height = '32px';
                 input.style.height = Math.min(input.scrollHeight, 112) + 'px';
@@ -504,9 +516,7 @@ define([
                             ' could not answer this request.');
                         return void finish();
                     }
-                    var responsePersona = result.persona === 'coach' ? {
-                        mention: '@coach', label: 'Trading Coach'
-                    } : { mention: '@ODV', label: 'ODV' };
+                    var responsePersona = TaskNodeChat.persona(result.persona) || request.persona;
                     var response = '**' + responsePersona.mention + ' · ' + responsePersona.label +
                         '**\n\n' + String(result.response);
                     execCommand('SEND_MESSAGE', { id: id, content: response }, function (responseErr) {

@@ -14,6 +14,44 @@ test('explicit assistant mentions use protocol boundaries across paraphrases', (
     assert.equal(protocol.mention('@coach ask @ODV too').persona, 'coach');
 });
 
+test('prompt documents address only the announced prompt assistant', () => {
+    const announced = { odv: { enabled: false }, agents: [{ persona: 'prompt', mention: '@prompt', label: 'Prompt Assistant' }] };
+    const promptAgents = protocol.agents(announced, true);
+    assert.deepEqual(promptAgents, [{ persona: 'prompt', mention: '@prompt', label: 'Prompt Assistant' }]);
+    for (const text of ['@prompt what does this do?', 'Is step 2 ambiguous, @PROMPT?', 'Rewrite it\n@prompt: shorter']) {
+        assert.deepEqual(protocol.mention(text, promptAgents), { persona: 'prompt', mention: '@prompt', label: 'Prompt Assistant' });
+    }
+    for (const text of ['@ODV review', '@coach help', 'the prompt is long', 'a@prompt.example', '@prompts', '@prompt_x']) {
+        assert.equal(protocol.mention(text, promptAgents), undefined);
+    }
+    // Other assistants cannot be smuggled into a prompt document, and nothing
+    // is addressable until Task Node announces the prompt assistant.
+    assert.deepEqual(protocol.agents({ odv: { enabled: true }, agents: [{ persona: 'odv' }, { persona: 'coach' }] }, true), []);
+    assert.equal(protocol.mention('@prompt hello', protocol.agents({ agents: [] }, true)), undefined);
+    assert.deepEqual(protocol.agents({ agents: [{ persona: 'odv' }, { persona: 'prompt' }, { persona: 'prompt' }] }, true).map(a => a.persona), ['prompt']);
+});
+
+test('ordinary documents never address the prompt assistant', () => {
+    const agents = protocol.agents({ odv: { enabled: true }, agents: [{ persona: 'odv' }, { persona: 'coach' }, { persona: 'prompt' }, { persona: 'unknown' }, null] }, false);
+    assert.deepEqual(agents.map(a => a.persona), ['odv', 'coach']);
+    assert.deepEqual(agents[0], { persona: 'odv', mention: '@ODV', label: 'ODV' });
+    assert.equal(protocol.mention('@prompt review this', agents), undefined);
+    assert.equal(protocol.mention('@prompt then @coach', agents).persona, 'coach');
+    assert.equal(protocol.mention('@prompt review this'), undefined);
+    assert.equal(protocol.mention('@coach', protocol.agents({ agents: [{ persona: 'odv' }] }, false)), undefined);
+    // Legacy contexts that only enable ODV still address ODV.
+    assert.deepEqual(protocol.agents({ odv: { enabled: true } }, false).map(a => a.persona), ['odv']);
+    assert.deepEqual(protocol.agents({ odv: { enabled: false } }, false), []);
+    assert.deepEqual(protocol.agents(undefined, false), []);
+});
+
+test('persona lookup drives response labels', () => {
+    assert.deepEqual(protocol.persona('PROMPT'), { persona: 'prompt', mention: '@prompt', label: 'Prompt Assistant' });
+    assert.deepEqual(protocol.persona('coach'), { persona: 'coach', mention: '@coach', label: 'Trading Coach' });
+    assert.equal(protocol.persona('other'), undefined);
+    assert.deepEqual(protocol.assistantMessage('**@prompt · Prompt Assistant**\n\nLine 3 is ambiguous.'), { body: 'Line 3 is ambiguous.', persona: 'prompt', label: 'Prompt Assistant' });
+});
+
 test('assistant envelopes preserve body text and supported historical labels', () => {
     assert.deepEqual(protocol.assistantMessage('**@coach · Trading Coach**\n\nA response.'), { body: 'A response.', persona: 'coach', label: 'Trading Coach' });
     assert.equal(protocol.assistantMessage('**@ODV · GLM 5.2 via Ambient**\nLegacy.').body, 'Legacy.');

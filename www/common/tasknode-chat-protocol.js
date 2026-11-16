@@ -5,19 +5,53 @@
 }(function () {
     'use strict';
     var personas = [
-        { persona: 'odv', mention: '@odv', label: 'ODV' },
-        { persona: 'coach', mention: '@coach', label: 'Trading Coach' }
+        { persona: 'odv', mention: '@odv', display: '@ODV', label: 'ODV' },
+        { persona: 'coach', mention: '@coach', display: '@coach', label: 'Trading Coach' },
+        { persona: 'prompt', mention: '@prompt', display: '@prompt', label: 'Prompt Assistant' }
     ];
-    function mention(value) {
+    function persona(id) {
+        var key = String(id || '').toLowerCase();
+        for (var p = 0; p < personas.length; p++) {
+            if (personas[p].persona === key) {
+                return { persona: personas[p].persona, mention: personas[p].display, label: personas[p].label };
+            }
+        }
+    }
+    // The assistants a document can address are the ones Task Node announced in
+    // its context message. Prompt documents accept only the prompt assistant;
+    // every other document never accepts it.
+    function agents(context, promptMode) {
+        var list = context && Array.isArray(context.agents) ? context.agents.slice(0, 8) : [];
+        var result = [];
+        var add = function (id) {
+            var known = persona(id);
+            if (!known || (known.persona === 'prompt') !== (promptMode === true)) { return; }
+            if (result.some(function (agent) { return agent.persona === known.persona; })) { return; }
+            result.push(known);
+        };
+        list.forEach(function (agent) { add(agent && agent.persona); });
+        if (context && context.odv && context.odv.enabled === true) { add('odv'); }
+        return result;
+    }
+    // Without an announced agent list only the document assistants are
+    // addressable; the prompt assistant always has to be announced.
+    function candidates(allowed) {
+        return personas.filter(function (entry) {
+            if (!Array.isArray(allowed)) { return entry.persona !== 'prompt'; }
+            return allowed.some(function (agent) { return agent && agent.persona === entry.persona; });
+        });
+    }
+    function mention(value, allowed) {
         var text = String(value || '').toLowerCase();
+        var list = candidates(allowed);
         for (var index = 0; index < text.length; index++) {
             if (index && text[index - 1].trim()) { continue; }
-            for (var p = 0; p < personas.length; p++) {
-                var persona = personas[p];
+            for (var p = 0; p < list.length; p++) {
+                var persona = list[p];
                 if (text.slice(index, index + persona.mention.length) !== persona.mention) { continue; }
                 var next = text[index + persona.mention.length] || '';
                 if (next && 'abcdefghijklmnopqrstuvwxyz0123456789_'.indexOf(next) !== -1) { continue; }
-                return { persona: persona.persona, mention: persona.persona === 'odv' ? '@ODV' : '@coach', label: persona.label };
+                return { persona: persona.persona, mention: persona.display, label: persona.label };
             }
         }
     }
@@ -73,6 +107,6 @@
         });
         return JSON.stringify(result);
     }
-    return { mention: mention, assistantMessage: assistantMessage, documentText: documentText, spreadsheetText: spreadsheetText,
+    return { persona: persona, agents: agents, mention: mention, assistantMessage: assistantMessage, documentText: documentText, spreadsheetText: spreadsheetText,
         assistantTimeoutMs: 570000, assistantQueryTimeoutMs: 600000 };
 }));
